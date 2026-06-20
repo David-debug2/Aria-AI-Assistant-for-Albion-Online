@@ -6,9 +6,9 @@ const { resolveItems } = require('./item-resolver');
 const { getCached, setCached } = require('./market-cache');
 
 const SERVERS = {
-  west:   'https://west.albion-online-data.com/api/v2',
-  east:   'https://east.albion-online-data.com/api/v2',
-  europe: 'https://europe.albion-online-data.com/api/v2',
+  west:   'https://west.albion-online-data.com',
+  east:   'https://east.albion-online-data.com',
+  europe: 'https://europe.albion-online-data.com',
 };
 
 const DEFAULT_LOCATIONS = ['Caerleon', 'Bridgewatch', 'Martlock', 'Thetford', 'Fort Sterling', 'Lymhurst'];
@@ -42,7 +42,7 @@ async function getPrices(
   if (cached) return { data: cached, fromCache: true };
 
   const base = SERVERS[server] || SERVERS.west;
-  const url = `${base}/stats/prices/${resolvedIds.join(',')}?locations=${locations.join(',')}&qualities=1,2,3`;
+  const url = `${base}/api/v2/stats/prices/${resolvedIds.join(',')}?locations=${locations.join(',')}&qualities=1,2,3`;
 
   try {
     const res = await fetch(url);
@@ -79,7 +79,7 @@ async function getPriceHistory(itemQuery, location = 'Caerleon', timescale = 24)
   const cached = getCached(cacheKey);
   if (cached) return { data: cached, fromCache: true };
 
-  const url = `${SERVERS.west}/stats/history/${itemId}?locations=${location}&time-scale=${timescale}`;
+  const url = `${SERVERS.west}/api/v2/stats/history/${itemId}?locations=${location}&time-scale=${timescale}`;
 
   try {
     const res = await fetch(url);
