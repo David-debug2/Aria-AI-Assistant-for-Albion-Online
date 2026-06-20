@@ -1,0 +1,546 @@
+/* Aria - Albion Online Strategy AI */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary: #1a1a2e;
+  --secondary: #16213e;
+  --accent: #0f3460;
+  --highlight: #e94560;
+  --success: #2ecc71;
+  --warning: #f39c12;
+  --danger: #e74c3c;
+  --text: #ecf0f1;
+  --text-muted: #95a5a6;
+  --border: #34495e;
+  --bg-hover: #0f2438;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--primary);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: var(--secondary);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  margin-bottom: 30px;
+  text-align: center;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header h1 {
+  font-size: 24px;
+  margin-bottom: 5px;
+  color: var(--highlight);
+}
+
+.sidebar-header .subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.nav-menu {
+  list-style: none;
+}
+
+.nav-link {
+  display: block;
+  padding: 12px 15px;
+  color: var(--text);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.3s ease;
+  margin-bottom: 5px;
+  border-radius: 4px;
+}
+
+.nav-link:hover {
+  background: var(--bg-hover);
+  border-left-color: var(--highlight);
+}
+
+.nav-link.active {
+  background: var(--accent);
+  border-left-color: var(--highlight);
+  color: var(--highlight);
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+  display: none;
+  padding: 30px;
+}
+
+.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chat Section */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-header {
+  margin-bottom: 20px;
+}
+
+.chat-header h2 {
+  font-size: 28px;
+  margin-bottom: 5px;
+  color: var(--highlight);
+}
+
+.chat-header p {
+  color: var(--text-muted);
+}
+
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 15px;
+  background: var(--accent);
+}
+
+.chat-message {
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 6px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message.bot-message {
+  background: var(--secondary);
+  border-left: 3px solid var(--highlight);
+}
+
+.chat-message.user-message {
+  background: var(--primary);
+  border-left: 3px solid var(--success);
+  margin-left: 20px;
+}
+
+.chat-message strong {
+  color: var(--highlight);
+}
+
+.chat-message ul {
+  margin-top: 10px;
+  margin-left: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.chat-message li {
+  margin-bottom: 5px;
+}
+
+.chat-input-container {
+  margin-top: 20px;
+}
+
+.chat-form {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-form input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.chat-form input:focus {
+  outline: none;
+  border-color: var(--highlight);
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.3);
+}
+
+.chat-status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 20px;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--highlight);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #d43a4c;
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Prices Section */
+.prices-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.prices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.prices-header h2 {
+  color: var(--highlight);
+  font-size: 28px;
+}
+
+.prices-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.select-field {
+  padding: 10px 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.price-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.price-form input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.price-results {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Crafting Section */
+.crafting-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.crafting-header {
+  margin-bottom: 25px;
+}
+
+.crafting-header h2 {
+  color: var(--highlight);
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.crafting-search {
+  margin-bottom: 25px;
+}
+
+.crafting-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.crafting-form input,
+.crafting-form select {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.crafting-form input {
+  flex: 1;
+  min-width: 250px;
+}
+
+.crafting-results {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Guild Section */
+.guild-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.guild-header {
+  margin-bottom: 25px;
+}
+
+.guild-header h2 {
+  color: var(--highlight);
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.guild-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tool-card {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.tool-card h3 {
+  color: var(--highlight);
+  margin-bottom: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group label {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.form-group input,
+.form-group select {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--text);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--highlight);
+}
+
+.form-group button {
+  margin-top: 10px;
+}
+
+.strategy-result {
+  margin-top: 15px;
+  padding: 15px;
+  background: var(--primary);
+  border-radius: 6px;
+  border-left: 3px solid var(--success);
+  min-height: 60px;
+  font-size: 13px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+/* Data Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--secondary);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.data-table th {
+  background: var(--accent);
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--highlight);
+  border-bottom: 2px solid var(--border);
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tr:hover {
+  background: var(--bg-hover);
+}
+
+/* Status Indicators */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-success {
+  background: rgba(46, 204, 113, 0.2);
+  color: var(--success);
+}
+
+.status-warning {
+  background: rgba(243, 156, 18, 0.2);
+  color: var(--warning);
+}
+
+.status-danger {
+  background: rgba(231, 76, 60, 0.2);
+  color: var(--danger);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--highlight);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+  }
+
+  .sidebar-header {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .nav-menu {
+    display: flex;
+    gap: 10px;
+  }
+
+  .nav-link {
+    padding: 8px 12px;
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+
+  .main-content {
+    min-height: calc(100vh - 100px);
+  }
+
+  .tab-content {
+    padding: 20px;
+  }
+
+  .guild-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-form {
+    flex-direction: column;
+  }
+
+  .crafting-form {
+    flex-direction: column;
+  }
+
+  .crafting-form input,
+  .crafting-form select {
+    min-width: auto;
+  }
+}

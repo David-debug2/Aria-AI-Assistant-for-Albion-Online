@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aria - Albion Online Strategy AI</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <h1>⚔️ Aria</h1>
+        <p class="subtitle">Albion Strategy AI</p>
+      </div>
+      <ul class="nav-menu">
+        <li><a href="#" data-tab="chat" class="nav-link active">💬 Chat</a></li>
+        <li><a href="#" data-tab="prices" class="nav-link">💰 Market</a></li>
+        <li><a href="#" data-tab="crafting" class="nav-link">🔨 Crafting</a></li>
+        <li><a href="#" data-tab="guild" class="nav-link">🏰 Guild</a></li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Chat Tab -->
+      <section id="chat-tab" class="tab-content active">
+        <div class="chat-container">
+          <div class="chat-header">
+            <h2>Ask Aria</h2>
+            <p>Get strategic advice about Albion Online</p>
+          </div>
+
+          <div id="chat-history" class="chat-history">
+            <div class="chat-message bot-message">
+              <strong>Aria:</strong>
+              <p>Welcome to Aria! Ask me anything about Albion Online:</p>
+              <ul>
+                <li>"What's the best T5 gear for PvP?"</li>
+                <li>"How do I make money fast?"</li>
+                <li>"What are the best hellgate builds?"</li>
+                <li>"Tell me about farming strategies"</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="chat-input-container">
+            <form id="chat-form" class="chat-form">
+              <input
+                type="text"
+                id="chat-input"
+                placeholder="Ask anything about Albion..."
+                autocomplete="off"
+              >
+              <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+            <div id="chat-status" class="chat-status"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Market Prices Tab -->
+      <section id="prices-tab" class="tab-content">
+        <div class="prices-container">
+          <div class="prices-header">
+            <h2>Market Price Checker</h2>
+            <div class="prices-controls">
+              <select id="server-select" class="select-field">
+                <option value="west">West Server</option>
+                <option value="east">East Server</option>
+                <option value="europe">Europe Server</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="price-search">
+            <form id="price-form" class="price-form">
+              <input
+                type="text"
+                id="price-input"
+                placeholder="Search item (e.g., T6 sword)"
+                autocomplete="off"
+              >
+              <button type="submit" class="btn btn-primary">Check Price</button>
+            </form>
+          </div>
+
+          <div id="price-results" class="price-results"></div>
+        </div>
+      </section>
+
+      <!-- Crafting Tab -->
+      <section id="crafting-tab" class="tab-content">
+        <div class="crafting-container">
+          <div class="crafting-header">
+            <h2>Crafting Profit Calculator</h2>
+            <p>Find the most profitable items to craft</p>
+          </div>
+
+          <div class="crafting-search">
+            <form id="crafting-form" class="crafting-form">
+              <input
+                type="text"
+                id="crafting-input"
+                placeholder="Item to craft (e.g., T5 helmet)"
+                autocomplete="off"
+              >
+              <select id="enchantment-select" class="select-field">
+                <option value="0">No Enchantment (@0)</option>
+                <option value="1">Enchanted Level 1 (@1)</option>
+                <option value="2">Enchanted Level 2 (@2)</option>
+                <option value="3">Enchanted Level 3 (@3)</option>
+              </select>
+              <button type="submit" class="btn btn-primary">Calculate</button>
+            </form>
+          </div>
+
+          <div id="crafting-results" class="crafting-results"></div>
+        </div>
+      </section>
+
+      <!-- Guild Strategy Tab -->
+      <section id="guild-tab" class="tab-content">
+        <div class="guild-container">
+          <div class="guild-header">
+            <h2>Guild Strategy Advisor</h2>
+            <p>Plan your guild's next move</p>
+          </div>
+
+          <div class="guild-tools">
+            <div class="tool-card">
+              <h3>Territory Strategy</h3>
+              <form id="territory-form" class="form-group">
+                <label>Guild Members:</label>
+                <input type="number" id="guild-members" placeholder="30" min="1" value="30">
+
+                <label>Treasury (Silver):</label>
+                <input type="number" id="guild-treasury" placeholder="100000" min="0" value="100000">
+
+                <label>Experience:</label>
+                <select id="guild-experience">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">Get Strategy</button>
+              </form>
+              <div id="territory-result" class="strategy-result"></div>
+            </div>
+
+            <div class="tool-card">
+              <h3>ZvZ Composition</h3>
+              <form id="zvz-form" class="form-group">
+                <label>Battle Scale:</label>
+                <select id="zvz-scale">
+                  <option value="small">5v5 (Small)</option>
+                  <option value="medium">15v15 (Medium)</option>
+                  <option value="large">40v40 (Large)</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">Show Composition</button>
+              </form>
+              <div id="zvz-result" class="strategy-result"></div>
+            </div>
+
+            <div class="tool-card">
+              <h3>Guild Progression</h3>
+              <form id="progression-form" class="form-group">
+                <label>Current Members:</label>
+                <input type="number" id="prog-members" placeholder="20" min="1" value="20">
+
+                <label>Experience:</label>
+                <select id="prog-experience">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">Get Roadmap</button>
+              </form>
+              <div id="progression-result" class="strategy-result"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
