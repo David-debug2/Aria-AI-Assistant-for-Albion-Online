@@ -15,18 +15,16 @@ test('Market Cache', async (t) => {
     assert.strictEqual(result, null, 'Should return null for missing keys');
   });
 
-  await t.test('should respect TTL expiration', (t) => {
+  await t.test('should respect TTL expiration', async () => {
     // Set data with 100ms TTL
     setCached('expiring-key', { value: 'temp' }, 100);
     const before = getCached('expiring-key');
     assert(before, 'Should exist before TTL');
 
     // Wait for expiration
-    setTimeout(() => {
-      const after = getCached('expiring-key');
-      assert.strictEqual(after, null, 'Should be null after TTL');
-      t.pass();
-    }, 150);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const after = getCached('expiring-key');
+    assert.strictEqual(after, null, 'Should be null after TTL');
   });
 
   await t.test('should track stats', () => {

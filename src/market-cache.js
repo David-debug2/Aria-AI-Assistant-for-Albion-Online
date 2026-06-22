@@ -5,14 +5,21 @@
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const cache = new Map();
+let hits = 0;
+let misses = 0;
 
 function getCached(key) {
   const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
+  if (!entry) {
+    misses++;
     return null;
   }
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    misses++;
+    return null;
+  }
+  hits++;
   return entry.data;
 }
 
@@ -29,6 +36,8 @@ function invalidate(key) {
 
 function clearAll() {
   cache.clear();
+  hits = 0;
+  misses = 0;
 }
 
 // Report how many entries are live (useful for a /health endpoint)
@@ -38,7 +47,7 @@ function stats() {
   for (const entry of cache.values()) {
     if (entry.expiresAt > now) live++;
   }
-  return { total: cache.size, live };
+  return { size: cache.size, total: cache.size, live, hits, misses };
 }
 
 module.exports = { getCached, setCached, invalidate, clearAll, stats };

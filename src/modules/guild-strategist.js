@@ -160,7 +160,7 @@ function getTerritoryStrategy(guildStats = {}) {
 
   if (members < 15 || experience === 'beginner') {
     recommendation = 'residential';
-  } else if (members >= 15 && members < 50) {
+  } else if (members >= 15 && members < 300) {
     recommendation = 'industrial';
   } else {
     recommendation = 'commercial';
@@ -320,7 +320,7 @@ function analyzeAlliance(allyGuildSizes = []) {
     totalCombinedMembers: combinedMembers,
     strength:
       combinedMembers >= 500
-        ? 'Mega-alliance (Can control region)'
+        ? 'Strong mega-alliance (Can control region)'
         : combinedMembers >= 250
         ? 'Strong alliance (Can win territory wars)'
         : combinedMembers >= 100

@@ -35,6 +35,28 @@ function getSearchEngine() {
   return fuse;
 }
 
+function findExactTierItem(query) {
+  const normalized = query.toLowerCase().trim();
+  const tierMatch = normalized.match(/\b(?:t|tier\s*)([1-8])\b/);
+  if (!tierMatch) return null;
+
+  const enchantMatch = normalized.match(/(?:@|\.)\s*([1-4])\b/);
+  const tier = tierMatch[1];
+  const enchantment = enchantMatch ? `@${enchantMatch[1]}` : '';
+
+  const weaponAliases = [
+    { terms: ['sword', 'broadsword'], itemKey: 'MAIN_SWORD' },
+    { terms: ['holy staff'], itemKey: 'MAIN_HOLYSTAFF' },
+    { terms: ['nature staff'], itemKey: 'MAIN_NATURESTAFF' },
+  ];
+
+  const alias = weaponAliases.find(entry => entry.terms.some(term => normalized.includes(term)));
+  if (!alias) return null;
+
+  const id = `T${tier}_${alias.itemKey}${enchantment}`;
+  return itemIndex.find(item => item.id === id) || null;
+}
+
 /**
  * Resolve a single player-typed term to the best matching item ID.
  *
@@ -45,6 +67,16 @@ function resolveItem(query) {
   if (!query || query.trim().length < 3) return null;
   
   const engine = getSearchEngine();
+  const exactMatch = findExactTierItem(query);
+
+  if (exactMatch) {
+    return {
+      id: exactMatch.id,
+      name: exactMatch.name,
+      score: 0,
+    };
+  }
+
   const results = engine.search(query.toLowerCase().trim());
 
   if (results.length === 0) return null;

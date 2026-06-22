@@ -22,6 +22,18 @@ test('parseBasicsProgression produces 3-10 chunks and includes headings', () => 
   }
 });
 
+test('all brain files produce 3-10 section chunks', () => {
+  const brainDir = path.join(__dirname, '..', 'albion-brain');
+  const files = fs.readdirSync(brainDir).filter(file => file.endsWith('.md'));
+
+  assert.strictEqual(files.length, 9, 'expected 9 brain markdown files');
+
+  for (const file of files) {
+    const chunks = parseMarkdownToChunks(loadFile(file), file);
+    assert.ok(chunks.length >= 3 && chunks.length <= 10, `${file} produced ${chunks.length} chunks`);
+  }
+});
+
 test('parseEconomyMarket preserves tables inside a chunk', () => {
   const content = loadFile('5_economy_market.md');
   const chunks = parseMarkdownToChunks(content, '5_economy_market.md');
@@ -44,4 +56,6 @@ test('loadBrainContext returns top chunks and same response shape', () => {
 
   const chunkHeaders = (context.match(/### ALBION KNOWLEDGE/g) || []).length;
   assert.ok(chunkHeaders <= 6, `expected at most 6 selected chunks, got ${chunkHeaders}`);
+  assert.ok(chunkHeaders <= 2, `expected ore refining query to retrieve only 1-2 sections, got ${chunkHeaders}`);
+  assert.deepStrictEqual(filesLoaded, ['6_crafting_refining.md']);
 });
