@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { loadBrainContext } = require('./brain-loader');
 
@@ -27,7 +27,7 @@ Be direct and specific. Avoid vague advice. Format your response in clean Markdo
  */
 
 async function ask(query, liveData = null, forceIntent = null, aiOptions = null) {
-  const { context, intent, filesLoaded } = loadBrainContext(query, forceIntent);
+  const { context, intent, filesLoaded } = await loadBrainContext(query, forceIntent);
 
   const liveSection = liveData
     ? `\n\n### LIVE MARKET DATA ###\n\`\`\`json\n${JSON.stringify(liveData, null, 2)}\n\`\`\``

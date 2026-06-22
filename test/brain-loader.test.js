@@ -1,9 +1,15 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { parseMarkdownToChunks, loadBrainContext } = require('../src/brain-loader');
+const {
+  parseMarkdownToChunks,
+  loadBrainContext,
+  retrieveChunks,
+  resetBrainEmbeddingCache,
+} = require('../src/brain-loader');
 
 function loadFile(name) {
   return fs.readFileSync(path.join(__dirname, '..', 'albion-brain', name), 'utf-8');
@@ -45,8 +51,21 @@ test('parseEconomyMarket preserves tables inside a chunk', () => {
   assert.ok(hasTable, 'expected at least one chunk to contain the table header');
 });
 
-test('loadBrainContext returns top chunks and same response shape', () => {
-  const { context, intent, filesLoaded } = loadBrainContext('How do I refine ore?', null);
+test('loadBrainContext returns top chunks and same response shape', async (t) => {
+  const originalKey = process.env.GOOGLE_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  resetBrainEmbeddingCache();
+
+  t.after(() => {
+    if (originalKey === undefined) {
+      delete process.env.GOOGLE_API_KEY;
+    } else {
+      process.env.GOOGLE_API_KEY = originalKey;
+    }
+    resetBrainEmbeddingCache();
+  });
+
+  const { context, intent, filesLoaded } = await loadBrainContext('How do I refine ore?', null);
 
   assert.strictEqual(typeof context, 'string');
   assert.strictEqual(typeof intent, 'string');
@@ -58,4 +77,63 @@ test('loadBrainContext returns top chunks and same response shape', () => {
   assert.ok(chunkHeaders <= 6, `expected at most 6 selected chunks, got ${chunkHeaders}`);
   assert.ok(chunkHeaders <= 2, `expected ore refining query to retrieve only 1-2 sections, got ${chunkHeaders}`);
   assert.deepStrictEqual(filesLoaded, ['6_crafting_refining.md']);
+});
+
+test('retrieveChunks ranks fixture chunks by cosine similarity', (t) => {
+  const fixturePath = path.join(os.tmpdir(), `brain-embeddings-${Date.now()}.json`);
+  const originalPath = process.env.BRAIN_EMBEDDINGS_PATH;
+
+  fs.writeFileSync(fixturePath, JSON.stringify([
+    {
+      sourceFile: 'crafting.md',
+      heading: 'Refining',
+      content: 'Refine ore into bars.',
+      embedding: [1, 0, 0],
+    },
+    {
+      sourceFile: 'pvp.md',
+      heading: 'Ganking',
+      content: 'Catch players in lethal zones.',
+      embedding: [0, 1, 0],
+    },
+  ]));
+
+  process.env.BRAIN_EMBEDDINGS_PATH = fixturePath;
+  resetBrainEmbeddingCache();
+
+  t.after(() => {
+    fs.unlinkSync(fixturePath);
+    if (originalPath === undefined) {
+      delete process.env.BRAIN_EMBEDDINGS_PATH;
+    } else {
+      process.env.BRAIN_EMBEDDINGS_PATH = originalPath;
+    }
+    resetBrainEmbeddingCache();
+  });
+
+  const chunks = retrieveChunks([0.9, 0.1, 0], 1);
+
+  assert.strictEqual(chunks.length, 1);
+  assert.strictEqual(chunks[0].heading, 'Refining');
+  assert.ok(chunks[0].score > 0.9);
+});
+
+test('retrieveChunks reports missing embedding index with generation command', (t) => {
+  const originalPath = process.env.BRAIN_EMBEDDINGS_PATH;
+  process.env.BRAIN_EMBEDDINGS_PATH = path.join(os.tmpdir(), `missing-brain-embeddings-${Date.now()}.json`);
+  resetBrainEmbeddingCache();
+
+  t.after(() => {
+    if (originalPath === undefined) {
+      delete process.env.BRAIN_EMBEDDINGS_PATH;
+    } else {
+      process.env.BRAIN_EMBEDDINGS_PATH = originalPath;
+    }
+    resetBrainEmbeddingCache();
+  });
+
+  assert.throws(
+    () => retrieveChunks([1, 0, 0], 1),
+    /Brain embeddings not found\. Run: npm run embed-brain/
+  );
 });
