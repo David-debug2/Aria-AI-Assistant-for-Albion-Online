@@ -7,7 +7,30 @@ module.exports = {
     primaryModel: process.env.AI_MODEL || 'gemini',
     contextBudget: 64000,
     timeout: 30000,
-    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434'
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+    providers: {
+      openrouter: {
+        label: 'OpenRouter',
+        models: [
+          'openai/gpt-4o-mini',
+          'anthropic/claude-3.5-haiku',
+          'google/gemini-2.0-flash-001',
+          'meta-llama/llama-3.1-8b-instruct'
+        ]
+      },
+      openai: {
+        label: 'OpenAI',
+        models: ['gpt-4o-mini', 'gpt-4o']
+      },
+      anthropic: {
+        label: 'Anthropic',
+        models: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest']
+      },
+      gemini: {
+        label: 'Google Gemini',
+        models: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+      }
+    }
   },
   market: {
     cacheTTL: 300000,

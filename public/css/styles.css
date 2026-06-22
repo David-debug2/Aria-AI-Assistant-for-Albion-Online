@@ -238,6 +238,81 @@ body {
   transform: translateY(0);
 }
 
+.btn-secondary {
+  background: var(--accent);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+/* Settings Section */
+.settings-container {
+  max-width: 680px;
+}
+
+.settings-header {
+  margin-bottom: 25px;
+}
+
+.settings-header h2 {
+  color: var(--highlight);
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.settings-header p,
+.settings-note {
+  color: var(--text-muted);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 520px;
+}
+
+.settings-form label {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.settings-form input,
+.settings-form select {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.settings-form input:focus,
+.settings-form select:focus {
+  outline: none;
+  border-color: var(--highlight);
+  box-shadow: 0 0 8px rgba(233, 69, 96, 0.3);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.key-status {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.settings-note {
+  font-size: 13px;
+}
+
 /* Prices Section */
 .prices-container {
   display: flex;

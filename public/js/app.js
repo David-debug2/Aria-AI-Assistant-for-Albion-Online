@@ -3,11 +3,24 @@
 class AriaApp {
   constructor() {
     this.currentTab = 'chat';
+    this.providerModels = {
+      openrouter: [
+        'openai/gpt-4o-mini',
+        'anthropic/claude-3.5-haiku',
+        'google/gemini-2.0-flash-001',
+        'meta-llama/llama-3.1-8b-instruct',
+      ],
+      openai: ['gpt-4o-mini', 'gpt-4o'],
+      anthropic: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest'],
+      gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    };
     this.init();
   }
 
   init() {
+    this.loadAiSettings();
     this.setupEventListeners();
+    this.updateKeyStatus();
   }
 
   setupEventListeners() {
@@ -53,6 +66,31 @@ class AriaApp {
       e.preventDefault();
       this.handleProgressionSubmit();
     });
+
+    document.getElementById('provider-select').addEventListener('change', () => {
+      this.populateModelOptions();
+      this.saveAiSettings();
+    });
+
+    document.getElementById('model-select').addEventListener('change', () => {
+      this.saveAiSettings();
+    });
+
+    document.getElementById('provider-key-input').addEventListener('input', () => {
+      this.saveAiSettings();
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveAiSettings();
+      this.updateKeyStatus();
+    });
+
+    document.getElementById('clear-settings').addEventListener('click', () => {
+      sessionStorage.removeItem('ariaAiSettings');
+      this.loadAiSettings();
+      this.updateKeyStatus();
+    });
   }
 
   switchTab(tabName) {
@@ -74,6 +112,13 @@ class AriaApp {
 
     if (!message) return;
 
+    const aiSettings = this.getAiSettings();
+    if (!aiSettings.apiKey) {
+      this.addChatMessage('Configure an AI provider key in Settings before asking Aria. The key is stored only for this browser session.', 'bot');
+      this.switchTab('settings');
+      return;
+    }
+
     this.addChatMessage(message, 'user');
     input.value = '';
 
@@ -83,7 +128,7 @@ class AriaApp {
     try {
       const response = await fetch('/api/ask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.setAiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ query: message }),
       });
 
@@ -384,6 +429,79 @@ class AriaApp {
     if (members < 200) return roadmaps[2];
     if (members < 400) return roadmaps[3];
     return roadmaps[4];
+  }
+
+  populateModelOptions(selectedModel = null) {
+    const provider = document.getElementById('provider-select').value;
+    const modelSelect = document.getElementById('model-select');
+    const models = this.providerModels[provider] || [];
+
+    modelSelect.innerHTML = models
+      .map(model => `<option value="${model}">${model}</option>`)
+      .join('');
+
+    if (selectedModel && models.includes(selectedModel)) {
+      modelSelect.value = selectedModel;
+    }
+  }
+
+  loadAiSettings() {
+    const saved = this.getAiSettings();
+    const providerSelect = document.getElementById('provider-select');
+    const keyInput = document.getElementById('provider-key-input');
+
+    providerSelect.value = saved.provider || 'openrouter';
+    this.populateModelOptions(saved.model);
+    keyInput.value = saved.apiKey || '';
+  }
+
+  saveAiSettings() {
+    const provider = document.getElementById('provider-select').value;
+    const model = document.getElementById('model-select').value;
+    const apiKey = document.getElementById('provider-key-input').value.trim();
+
+    sessionStorage.setItem('ariaAiSettings', JSON.stringify({ provider, model, apiKey }));
+    this.updateKeyStatus();
+  }
+
+  getAiSettings() {
+    try {
+      return JSON.parse(sessionStorage.getItem('ariaAiSettings')) || {
+        provider: 'openrouter',
+        model: this.providerModels.openrouter[0],
+        apiKey: '',
+      };
+    } catch (err) {
+      return {
+        provider: 'openrouter',
+        model: this.providerModels.openrouter[0],
+        apiKey: '',
+      };
+    }
+  }
+
+  setAiHeaders(headers) {
+    const { provider, model, apiKey } = this.getAiSettings();
+    return {
+      ...headers,
+      'X-Provider': provider,
+      'X-Model': model,
+      'X-Provider-Key': apiKey,
+    };
+  }
+
+  updateKeyStatus() {
+    const status = document.getElementById('key-status');
+    const { provider, model, apiKey } = this.getAiSettings();
+
+    if (!apiKey) {
+      status.textContent = 'No key configured';
+      status.className = 'key-status status-danger';
+      return;
+    }
+
+    status.textContent = `Key configured for ${provider} / ${model}`;
+    status.className = 'key-status status-success';
   }
 
   addChatMessage(text, sender) {

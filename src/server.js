@@ -13,19 +13,26 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-// --- Error Handler Middleware ---
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    return res.status(400).json({ error: 'Invalid JSON in request body' });
-  }
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+function validateAiHeaders(headers) {
+  const provider = String(headers['x-provider'] || '').trim().toLowerCase();
+  const model = String(headers['x-model'] || '').trim();
+  const apiKey = String(headers['x-provider-key'] || '').trim();
 
-// --- 404 Handler ---
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
-});
+  if (!provider || !model || !apiKey) {
+    return { error: 'Provider, model, and API key are required.' };
+  }
+
+  const providerConfig = config.ai.providers[provider];
+  if (!providerConfig) {
+    return { error: 'Unsupported AI provider.' };
+  }
+
+  if (!providerConfig.models.includes(model)) {
+    return { error: 'Unsupported AI model for selected provider.' };
+  }
+
+  return { value: { provider, model, apiKey } };
+}
 
 // --- AI Chat Endpoint ---
 app.post('/api/ask', async (req, res) => {
@@ -36,13 +43,18 @@ app.post('/api/ask', async (req, res) => {
       return res.status(400).json({ error: 'Query must be at least 3 characters.' });
     }
 
+    const aiOptions = validateAiHeaders(req.headers);
+    if (aiOptions.error) {
+      return res.status(400).json({ error: aiOptions.error });
+    }
+
     let liveData = null;
     if (itemQueries && Array.isArray(itemQueries) && itemQueries.length > 0) {
       const prices = await getPrices(itemQueries, server || 'west');
       if (!prices.error) liveData = prices.data;
     }
 
-    const result = await ask(query.trim(), liveData);
+    const result = await ask(query.trim(), liveData, null, aiOptions.value);
     res.json(result);
   } catch (err) {
     console.error('AI error:', err.message);
@@ -198,6 +210,20 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// --- 404 Handler ---
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// --- Error Handler Middleware ---
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 // --- Graceful Error Handling ---
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -211,8 +237,12 @@ process.on('uncaughtException', (err) => {
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-app.listen(PORT, HOST, () => {
-  console.log(`⚔️  Aria running at http://${HOST}:${PORT}`);
-  console.log(`📚 Knowledge base: ${config.brain.filePath}`);
-  console.log(`🤖 AI Model: ${config.ai.primaryModel}`);
-});
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`⚔️  Aria running at http://${HOST}:${PORT}`);
+    console.log(`📚 Knowledge base: ${config.brain.filePath}`);
+    console.log(`🤖 AI Model: ${config.ai.primaryModel}`);
+  });
+}
+
+module.exports = { app, validateAiHeaders };
