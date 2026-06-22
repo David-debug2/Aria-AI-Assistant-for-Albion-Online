@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const config = require('../config/config.js');
 
 const BRAIN_DIR = path.join(__dirname, '../albion-brain');
 
@@ -95,9 +96,11 @@ function parseMarkdownToChunks(markdown, sourceFile) {
     const headerMatch = line.match(/^##\s+(.*)$/);
 
     if (headerMatch) {
-      // If we have an existing buffer, flush it as a chunk
+      // If we have an existing buffer before the first header, keep it.
       if (currentHeading !== null) {
         chunks.push({ heading: currentHeading, content: buffer.join('\n').trim(), sourceFile });
+      } else if (buffer.length > 0) {
+        chunks.push({ heading: '', content: buffer.join('\n').trim(), sourceFile });
       }
 
       currentHeading = headerMatch[1].trim();
@@ -118,6 +121,50 @@ function parseMarkdownToChunks(markdown, sourceFile) {
   }
 
   return chunks;
+}
+
+function scoreChunk(chunk, intent) {
+  const keywords = (config.brain && config.brain.intentKeywords && config.brain.intentKeywords[intent]) || [];
+  const lowerContent = `${chunk.heading} ${chunk.content}`.toLowerCase();
+
+  return keywords.reduce((score, keyword) => {
+    if (!keyword || typeof keyword !== 'string') return score;
+    const term = keyword.toLowerCase();
+    return score + (lowerContent.includes(term) ? 1 : 0);
+  }, 0);
+}
+
+function selectTopChunks(chunks, intent, k = 6) {
+  const scored = chunks
+    .map((chunk, index) => ({
+      ...chunk,
+      score: scoreChunk(chunk, intent),
+      order: index,
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.order - b.order;
+    });
+
+  return scored.slice(0, k);
+}
+
+function buildContextFromChunks(chunks) {
+  const contextPieces = [];
+  let totalLength = 0;
+
+  for (const chunk of chunks) {
+    const header = `\n\n### ALBION KNOWLEDGE — ${chunk.sourceFile.replace('.md', '').toUpperCase()} — ${chunk.heading} ###\n\n`;
+    const piece = header + chunk.content;
+    const nextLength = totalLength + piece.length;
+
+    if (nextLength > MAX_CONTEXT_CHARS) break;
+
+    contextPieces.push(piece);
+    totalLength = nextLength;
+  }
+
+  return contextPieces.join('');
 }
 
 /**
@@ -150,8 +197,7 @@ function loadBrainContext(query, forceIntent = null) {
   const intent = forceIntent || detectIntent(query);
   const files = MODULE_MAP[intent] || MODULE_MAP['build'];
   const loaded = [];
-  
-  let context = '';
+  const chunks = [];
 
   for (const filename of files) {
     const filePath = path.join(BRAIN_DIR, filename);
@@ -162,38 +208,20 @@ function loadBrainContext(query, forceIntent = null) {
     }
 
     const content = fs.readFileSync(filePath, 'utf-8').trim();
-    // Backwards-compatible: if needed, consumers can use parseMarkdownToChunks
-    // to operate on header-delimited sections. For now we preserve existing
-    // whole-file behavior here.
-    const header = `\n\n### ALBION KNOWLEDGE — ${filename.replace('.md', '').toUpperCase()} ###\n\n`;
-    
-    // Dynamic calculation: Measure directly against the actual growing context length
-    const remaining = MAX_CONTEXT_CHARS - context.length;
-    const minimalThreshold = header.length + 200;
+    const fileChunks = parseMarkdownToChunks(content, filename);
 
-    if (remaining <= minimalThreshold) break; 
-
-    const maxChunkAllowed = remaining - header.length;
-    let chunk;
-
-    if (content.length <= maxChunkAllowed) {
-      chunk = content; 
-    } else {
-      // Clean truncation backing down to the nearest newline character boundary
-      const truncated = content.slice(0, maxChunkAllowed);
-      const lastNewline = truncated.lastIndexOf('\n');
-      
-      chunk = lastNewline > maxChunkAllowed * 0.7
-        ? truncated.slice(0, lastNewline)
-        : truncated;
-      chunk += '\n\n[...file trimmed to fit context budget]';
+    for (const chunk of fileChunks) {
+      chunks.push(chunk);
     }
 
-    context += header + chunk;
     loaded.push(filename);
   }
 
-  return { context, intent, filesLoaded: loaded };
+  const topChunks = selectTopChunks(chunks, intent, 6);
+  const context = buildContextFromChunks(topChunks);
+  const filesLoaded = Array.from(new Set(topChunks.map(c => c.sourceFile)));
+
+  return { context, intent, filesLoaded };
 }
 
 module.exports = { loadBrainContext, detectIntent, parseMarkdownToChunks };
