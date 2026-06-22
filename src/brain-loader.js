@@ -73,6 +73,54 @@ const INTENT_KEYWORDS = [
 const MAX_CONTEXT_CHARS = 64000;
 
 /**
+ * Parse a markdown file into header-delimited chunks. Splits on lines starting
+ * with `##` or `###` and returns an array of `{ heading, content, sourceFile }`.
+ *
+ * @param {string} markdown
+ * @param {string} sourceFile
+ * @returns {Array<{heading:string,content:string,sourceFile:string}>}
+ */
+function parseMarkdownToChunks(markdown, sourceFile) {
+  const lines = markdown.split(/\r?\n/);
+  const chunks = [];
+
+  let currentHeading = null;
+  let buffer = [];
+
+  // Skip top-level title lines that start with a single '#'
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Only split on '## ' (two hashes) so that '###' subheadings remain inside a chunk
+    const headerMatch = line.match(/^##\s+(.*)$/);
+
+    if (headerMatch) {
+      // If we have an existing buffer, flush it as a chunk
+      if (currentHeading !== null) {
+        chunks.push({ heading: currentHeading, content: buffer.join('\n').trim(), sourceFile });
+      }
+
+      currentHeading = headerMatch[1].trim();
+      buffer = [];
+      continue;
+    }
+
+    // Lines before the first '##' header are grouped under a null heading
+    buffer.push(line);
+  }
+
+  // Flush the final buffer
+  if (currentHeading !== null) {
+    chunks.push({ heading: currentHeading, content: buffer.join('\n').trim(), sourceFile });
+  } else if (buffer.length > 0) {
+    // Entire file had no '##' headers — return as single chunk
+    chunks.push({ heading: '', content: buffer.join('\n').trim(), sourceFile });
+  }
+
+  return chunks;
+}
+
+/**
  * Detect the primary intent of a user query using word boundaries or explicit substrings.
  *
  * @param {string} query
@@ -114,6 +162,9 @@ function loadBrainContext(query, forceIntent = null) {
     }
 
     const content = fs.readFileSync(filePath, 'utf-8').trim();
+    // Backwards-compatible: if needed, consumers can use parseMarkdownToChunks
+    // to operate on header-delimited sections. For now we preserve existing
+    // whole-file behavior here.
     const header = `\n\n### ALBION KNOWLEDGE — ${filename.replace('.md', '').toUpperCase()} ###\n\n`;
     
     // Dynamic calculation: Measure directly against the actual growing context length
@@ -145,4 +196,4 @@ function loadBrainContext(query, forceIntent = null) {
   return { context, intent, filesLoaded: loaded };
 }
 
-module.exports = { loadBrainContext, detectIntent };
+module.exports = { loadBrainContext, detectIntent, parseMarkdownToChunks };
