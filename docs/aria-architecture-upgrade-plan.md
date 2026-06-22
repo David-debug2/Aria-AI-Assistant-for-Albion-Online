@@ -48,34 +48,129 @@ Aria currently spends most of its tokens on two structural habits: `brain-loader
 
 ---
 
-### Phase 1: SDK Migration
+### Phase 1: User-Supplied API Key System
 
-#### Task 3: Install `@google/genai`, remove the deprecated package
-**Description:** Swap the dependency and update the client instantiation pattern from `new GoogleGenerativeAI(key)` to `new GoogleGenAI({apiKey})`.
+Perfect. Public-facing + user-supplied keys is the most security-sensitive combination.
+
+#### Phase 1A: Expand
+
+Given Aria's context - public-facing, Node/Express backend, existing `ai-agent.js` with hardcoded Gemini - these are the directions worth considering:
+
+**A. Frontend-Only Key Storage (Zero-Trust Backend)**
+User enters a key in the UI, it lives in `sessionStorage` only, and it gets sent with every `/api/ask` request as a header. The backend never stores it. This is safest for users and simplest to build.
+
+**B. OpenRouter as the Universal Gateway**
+Instead of supporting five providers separately, support one gateway first: OpenRouter. One API key format, one API shape, and access to GPT, Gemini, Claude, Mistral, and Llama models through a single model dropdown. This massively reduces code complexity.
+
+**C. Provider-Aware Backend with Per-Request Key Injection**
+User selects provider + model + pastes a key in the UI. The frontend sends provider metadata and the key to the Express backend. The backend routes to the correct provider handler. This is more code but gives more flexibility.
+
+**D. Encrypted Server-Side Session Key**
+User enters a key once, backend encrypts it with a server secret and stores it in a session cookie. Subsequent requests do not resend the key. Cleaner UX, but higher backend complexity.
+
+**E. 10x Version - Aria as a Multi-Tenant SaaS**
+Users create accounts, store encrypted keys server-side per user profile, and pick a default provider. This is eventually useful but overkill for the current architecture.
+
+**F. Simplest Possible - Environment Variable UI**
+Admin-only settings page that writes to `.env`. Not per-user. Useful only if Aria is private or single-deployer. It does not fit the public-facing requirement.
+
+#### Phase 1B: Converge and Stress-Test
+
+| Direction | Security | Build Cost | UX | Fits Public-Facing? |
+|---|---|---|---|---|
+| A. Frontend-Only | Best | Low | Good | Yes |
+| B. OpenRouter Gateway | Good | Lowest | Best | Yes |
+| C. Provider-Aware Backend | Key in transit | Medium | Good | Yes |
+| D. Encrypted Session | Good | High | Best | Yes |
+| E. SaaS Multi-Tenant | Best | Very High | Best | Eventually |
+| F. Env Var UI | Poor | Trivial | Poor | No |
+
+**Hidden assumptions to surface:**
+
+- Users must be comfortable pasting API keys into a third-party UI, so Aria must be explicit about where the key goes.
+- Direction C sends the raw API key over HTTPS on every request. That is acceptable with TLS and unacceptable without it.
+- Direction B is not just a shortcut. OpenRouter is the right abstraction for this use case because it already covers the multi-model routing need that Phase 7 was heading toward.
+
+**Honest pushback on supporting all providers natively:** Building and maintaining separate SDK integrations for OpenAI, Gemini, Claude, Azure, and Copilot is several times more work than OpenRouter, with little user-visible benefit. The only strong reason to support native providers is that some users already have direct provider keys and do not want to create an OpenRouter account.
+
+#### Phase 1C: Recommended Direction
+
+Use a hybrid of **A + B**:
+
+> User-supplied key, stored in `sessionStorage` only, routed through a thin provider-abstraction layer on the backend, with OpenRouter as the recommended/default path and native fallbacks for users who already have direct provider keys.
+
+Build a settings panel in the existing sidebar UI. The user selects a provider, picks a model, and pastes an API key. The key is stored in `sessionStorage`; it is never written to a database and is cleared when the tab closes. Every request to `/api/ask` passes the key as an `X-Provider-Key` header alongside `X-Provider` and `X-Model`. The backend reads provider settings from the request, not from `.env`, and routes accordingly.
+
+**Provider strategy:** OpenRouter covers GPT, Claude, Gemini, Mistral, and Llama under one key format, so it should be the default "works with everything" option. Add native handlers for OpenAI, Anthropic Claude, and Google Gemini for users who already have direct keys. Skip Azure and Copilot in the MVP because their OAuth, tenant, and pricing models add disproportionate complexity.
+
+**Why `sessionStorage` over `localStorage`:** Keys do not survive tab close, reducing risk if a user shares a computer. The UI should show a clear notice: "Your API key is stored in your browser session only and is sent to the server only to forward your AI request."
+
+#### Task 3: Add frontend provider settings
+**Description:** Add a settings panel in the sidebar or chat view with provider dropdown, hardcoded model dropdown, API key input, and a key status indicator.
 **Acceptance criteria:**
-- [ ] `package.json` lists `@google/genai`, no longer lists `@google/generative-ai`
-- [ ] App boots without import errors
+- [ ] Provider choices include OpenRouter, OpenAI, Anthropic Claude, and Google Gemini
+- [ ] Model dropdown values are hardcoded per provider
+- [ ] API key is stored in `sessionStorage`, not `localStorage`
+- [ ] UI shows key set / no key state
 
 **Verification:**
-- [ ] `npm install && npm start` succeeds
-**Dependencies:** None (independent of Phase 0)
-**Files likely touched:** `package.json`, `src/ai-agent.js`
-**Estimated scope:** S (2 files)
+- [ ] Refresh keeps the key within the same tab session
+- [ ] Closing and reopening the tab clears the key
+**Dependencies:** None
+**Files likely touched:** `public/index.html`, `public/js/app.js`, `public/css/styles.css`
+**Estimated scope:** M (UI + state handling)
 
-#### Task 4: Port `askGemini` to the new call shape
-**Description:** Replace `genAI.getGenerativeModel({model, systemInstruction}).generateContent(prompt)` with `ai.models.generateContent({model, contents, config: {systemInstruction}})`.
+#### Task 4: Pass provider settings to `/api/ask`
+**Description:** Update chat submission so `/api/ask` sends `X-Provider-Key`, `X-Provider`, and `X-Model` headers from the session settings.
 **Acceptance criteria:**
-- [ ] `/api/ask` returns a valid response for a sample query through both `gemini-flash` and `gemini-pro` paths
+- [ ] Chat requests include provider headers when a key is configured
+- [ ] Chat requests fail early with a clear UI message if no key is configured for a user-facing provider
+- [ ] API keys are never logged in the browser console
 
 **Verification:**
-- [ ] Manual check: `curl -X POST localhost:3000/api/ask -d '{"query":"best T5 PvP build"}'`
+- [ ] Browser devtools confirms headers are present on `/api/ask`
+- [ ] Browser storage confirms the key only exists in session storage
 **Dependencies:** Task 3
-**Files likely touched:** `src/ai-agent.js`
-**Estimated scope:** S (1 file)
+**Files likely touched:** `public/js/app.js`
+**Estimated scope:** S (frontend request wiring)
+
+#### Task 5: Add backend provider routing
+**Description:** Update `server.js` and `ai-agent.js` so the selected provider, model, and per-request API key flow into the AI call. Add provider handlers for OpenRouter, OpenAI, Anthropic, and Gemini. Keep Ollama as a server-side-only option configured through `.env`, not through the public UI.
+**Acceptance criteria:**
+- [ ] Backend reads provider settings from request headers
+- [ ] Backend validates provider and model against a hardcoded allowlist
+- [ ] Backend never logs `X-Provider-Key`
+- [ ] OpenRouter is the default recommended provider
+- [ ] Ollama remains available only via server-side config and is not exposed as a public API-key option
+
+**Verification:**
+- [ ] Manual `/api/ask` smoke test succeeds with OpenRouter
+- [ ] Manual `/api/ask` smoke test succeeds with at least one native provider key
+- [ ] Invalid provider/model returns a 400 without calling an AI provider
+**Dependencies:** Task 4
+**Files likely touched:** `src/server.js`, `src/ai-agent.js`, possibly `config/config.js`
+**Estimated scope:** M (routing + provider functions)
+
+#### Task 6: Document the key handling model
+**Description:** Add documentation explaining where keys are stored, how they are transmitted, what is not stored server-side, and why Azure/Copilot are excluded from MVP.
+**Acceptance criteria:**
+- [ ] `docs/ideas/user-supplied-api-keys.md` exists
+- [ ] README or docs link points users/developers to the key-handling model
+- [ ] Security language matches implementation behavior
+
+**Verification:**
+- [ ] Search confirms no docs claim keys are server-stored
+**Dependencies:** Task 5
+**Files likely touched:** `docs/ideas/user-supplied-api-keys.md`, `README.md` or `docs/README.md`
+**Estimated scope:** S (docs)
 
 ### Checkpoint: Phase 1
-- [ ] `/api/ask`, `/api/crafting-profit` smoke-tested manually end to end
-- [ ] No references to `@google/generative-ai` remain in source
+- [ ] `/api/ask` smoke-tested manually with OpenRouter
+- [ ] `/api/ask` rejects missing/invalid provider config cleanly
+- [ ] No API key is persisted outside browser `sessionStorage`
+- [ ] No API key appears in server logs, browser logs, or test snapshots
+- [ ] Ollama remains server-side only
+- [ ] Hardcoded model lists are documented
 - [ ] Review with human before proceeding
 
 ---
