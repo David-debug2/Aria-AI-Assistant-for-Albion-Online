@@ -1,6 +1,11 @@
 require('dotenv').config({ quiet: true });
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { loadBrainContext } = require('./brain-loader');
+const {
+  getResponseSchema,
+  getResponseTypeForIntent,
+  validateResponse,
+} = require('./schemas');
 
 const genAI = process.env.GOOGLE_API_KEY ? new GoogleGenerativeAI(process.env.GOOGLE_API_KEY) : null;
 
@@ -14,7 +19,16 @@ const GEMINI_PRO_INTENTS = new Set(['build', 'pvp', 'guild', 'strategy']);
 const SYSTEM_PROMPT = `You are an expert Albion Online strategist, economist, and guide writer.
 You have been given a knowledge base about the game. Always prioritize information from that knowledge base.
 When live market data is included, analyze it concretely: give specific item names, exact silver values, and ranked recommendations.
-Be direct and specific. Avoid vague advice. Format your response in clean Markdown.`;
+Be direct and specific. Avoid vague advice.
+Return only valid JSON matching the response schema. Do not wrap JSON in Markdown fences.`;
+
+class MalformedModelOutputError extends Error {
+  constructor(message, details = []) {
+    super(message);
+    this.name = 'MalformedModelOutputError';
+    this.details = details;
+  }
+}
 
 /**
  * Main entry point. Accepts a query + optional live data and returns an AI response.
@@ -23,22 +37,24 @@ Be direct and specific. Avoid vague advice. Format your response in clean Markdo
  * @param {object|null} liveData - Optional live market/price data to inject
  * @param {string|null} forceIntent - Override intent detection
  * @param {{provider: string, model: string, apiKey: string}|null} aiOptions - User supplied provider config
- * @returns {Promise<{ response: string, engine: string, intent: string, filesLoaded: string[] }>}
+ * @returns {Promise<{ responseType: string, response: object, engine: string, intent: string, filesLoaded: string[] }>}
  */
 
 async function ask(query, liveData = null, forceIntent = null, aiOptions = null) {
   const { context, intent, filesLoaded } = await loadBrainContext(query, forceIntent);
+  const responseType = getResponseTypeForIntent(intent);
 
   const liveSection = liveData
     ? `\n\n### LIVE MARKET DATA ###\n\`\`\`json\n${JSON.stringify(liveData, null, 2)}\n\`\`\``
     : '';
 
   // Clean separation: User message only contains context data and the direct question
-  const userMessage = `${context}${liveSection}\n\n---\n\nPLAYER QUESTION:\n${query}`;
+  const userMessage = `${context}${liveSection}\n\n---\n\nPLAYER QUESTION:\n${query}${getResponseInstructions(responseType)}`;
 
   if (aiOptions) {
-    const response = await askProvider(userMessage, aiOptions);
+    const response = await askProvider(userMessage, aiOptions, responseType);
     return {
+      responseType,
       response,
       engine: `${aiOptions.provider}:${aiOptions.model}`,
       intent,
@@ -58,16 +74,18 @@ async function ask(query, liveData = null, forceIntent = null, aiOptions = null)
     response = await askOllama(userMessage, ollamaModel);
     
     if (!response) {
-      response = await askGemini(userMessage, GEMINI_FLASH);
-      return { response, engine: 'gemini-flash (ollama fallback)', intent, filesLoaded };
+      response = await askGemini(userMessage, GEMINI_FLASH, responseType);
+      return { responseType, response, engine: 'gemini-flash (ollama fallback)', intent, filesLoaded };
     }
+
+    response = parseAndValidateModelJson(response, responseType);
   } else if (engine === 'gemini-pro') {
-    response = await askGemini(userMessage, GEMINI_PRO);
+    response = await askGemini(userMessage, GEMINI_PRO, responseType);
   } else {
-    response = await askGemini(userMessage, GEMINI_FLASH);
+    response = await askGemini(userMessage, GEMINI_FLASH, responseType);
   }
 
-  return { response, engine, intent, filesLoaded };
+  return { responseType, response, engine, intent, filesLoaded };
 }
 
 function chooseEngine(intent, prompt) {
@@ -78,7 +96,31 @@ function chooseEngine(intent, prompt) {
   return 'gemini-flash'; 
 }
 
-async function askGemini(prompt, model = GEMINI_FLASH) {
+function getResponseInstructions(responseType) {
+  return `\n\nReturn JSON for responseType "${responseType}". All required fields must be present. Use empty arrays when there are no items.`;
+}
+
+function parseAndValidateModelJson(text, responseType) {
+  let jsonText = String(text || '').trim();
+  const fenced = jsonText.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced) jsonText = fenced[1].trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (err) {
+    throw new MalformedModelOutputError('Model returned malformed JSON', [err.message]);
+  }
+
+  const validation = validateResponse(responseType, parsed);
+  if (!validation.valid) {
+    throw new MalformedModelOutputError('Model JSON did not match the expected response schema', validation.errors);
+  }
+
+  return parsed;
+}
+
+async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswer') {
   if (!genAI) {
     throw new Error('GOOGLE_API_KEY is not configured');
   }
@@ -86,18 +128,22 @@ async function askGemini(prompt, model = GEMINI_FLASH) {
   // Passing systemInstruction cleanly into the model instance configuration
   const geminiModel = genAI.getGenerativeModel({ 
     model,
-    systemInstruction: SYSTEM_PROMPT 
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: getResponseSchema(responseType),
+    },
   });
   
   const result = await geminiModel.generateContent(prompt);
-  return result.response.text();
+  return parseAndValidateModelJson(result.response.text(), responseType);
 }
 
-async function askProvider(prompt, { provider, model, apiKey }) {
-  if (provider === 'openrouter') return askOpenRouter(prompt, model, apiKey);
-  if (provider === 'openai') return askOpenAI(prompt, model, apiKey);
-  if (provider === 'anthropic') return askAnthropic(prompt, model, apiKey);
-  if (provider === 'gemini') return askGeminiWithKey(prompt, model, apiKey);
+async function askProvider(prompt, { provider, model, apiKey }, responseType = 'chatAnswer') {
+  if (provider === 'openrouter') return askOpenRouter(prompt, model, apiKey, responseType);
+  if (provider === 'openai') return askOpenAI(prompt, model, apiKey, responseType);
+  if (provider === 'anthropic') return askAnthropic(prompt, model, apiKey, responseType);
+  if (provider === 'gemini') return askGeminiWithKey(prompt, model, apiKey, responseType);
 
   throw new Error('Unsupported AI provider');
 }
@@ -137,7 +183,7 @@ async function postJson(url, { headers, body }) {
   return data;
 }
 
-async function askOpenRouter(prompt, model, apiKey) {
+async function askOpenRouter(prompt, model, apiKey, responseType = 'chatAnswer') {
   const data = await postJson('https://openrouter.ai/api/v1/chat/completions', {
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -149,14 +195,15 @@ async function askOpenRouter(prompt, model, apiKey) {
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
-      ]
+      ],
+      response_format: { type: 'json_object' }
     }
   });
 
-  return data?.choices?.[0]?.message?.content || '';
+  return parseAndValidateModelJson(data?.choices?.[0]?.message?.content || '', responseType);
 }
 
-async function askOpenAI(prompt, model, apiKey) {
+async function askOpenAI(prompt, model, apiKey, responseType = 'chatAnswer') {
   const data = await postJson('https://api.openai.com/v1/chat/completions', {
     headers: { Authorization: `Bearer ${apiKey}` },
     body: {
@@ -164,14 +211,15 @@ async function askOpenAI(prompt, model, apiKey) {
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
-      ]
+      ],
+      response_format: { type: 'json_object' }
     }
   });
 
-  return data?.choices?.[0]?.message?.content || '';
+  return parseAndValidateModelJson(data?.choices?.[0]?.message?.content || '', responseType);
 }
 
-async function askAnthropic(prompt, model, apiKey) {
+async function askAnthropic(prompt, model, apiKey, responseType = 'chatAnswer') {
   const data = await postJson('https://api.anthropic.com/v1/messages', {
     headers: {
       'x-api-key': apiKey,
@@ -185,21 +233,27 @@ async function askAnthropic(prompt, model, apiKey) {
     }
   });
 
-  return (data?.content || [])
+  const content = (data?.content || [])
     .filter(part => part.type === 'text')
     .map(part => part.text)
     .join('\n');
+
+  return parseAndValidateModelJson(content, responseType);
 }
 
-async function askGeminiWithKey(prompt, model, apiKey) {
+async function askGeminiWithKey(prompt, model, apiKey, responseType = 'chatAnswer') {
   const userGenAI = new GoogleGenerativeAI(apiKey);
   const geminiModel = userGenAI.getGenerativeModel({
     model,
-    systemInstruction: SYSTEM_PROMPT
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: getResponseSchema(responseType),
+    },
   });
 
   const result = await geminiModel.generateContent(prompt);
-  return result.response.text();
+  return parseAndValidateModelJson(result.response.text(), responseType);
 }
 
 async function askOllama(prompt, modelOverride = null) {
@@ -228,5 +282,7 @@ module.exports = {
   askOpenRouter,
   askOpenAI,
   askAnthropic,
-  askGeminiWithKey
+  askGeminiWithKey,
+  MalformedModelOutputError,
+  parseAndValidateModelJson
 };

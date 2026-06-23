@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { ask } = require('./ai-agent');
+const { ask, MalformedModelOutputError } = require('./ai-agent');
 const { getPrices, getPriceHistory } = require('./market-api');
 const { calculateCraftingProfit } = require('./modules/crafting-profit');
 const { getTerritoryStrategy, getZvZComposition, getProgressionRoadmap } = require('./modules/guild-strategist');
@@ -55,10 +55,17 @@ app.post('/api/ask', async (req, res) => {
     }
 
     const result = await ask(query.trim(), liveData, null, aiOptions.value);
-    res.json(result);
+    res.json({
+      responseType: result.responseType,
+      ...result.response,
+      engine: result.engine,
+      intent: result.intent,
+      filesLoaded: result.filesLoaded,
+    });
   } catch (err) {
     console.error('AI error:', err.message);
-    res.status(500).json({ error: 'AI service temporarily unavailable' });
+    const status = err instanceof MalformedModelOutputError ? 503 : 500;
+    res.status(status).json({ error: 'AI service temporarily unavailable' });
   }
 });
 

@@ -141,13 +141,7 @@ class AriaApp {
       if (data.error) {
         this.addChatMessage(`❌ Error: ${data.error}`, 'bot');
       } else {
-        let botResponse = data.response || 'No response';
-
-        if (data.engine || data.intent) {
-          botResponse += `\n\n_Engine: ${data.engine || 'unknown'} | Intent: ${data.intent || 'unknown'}_`;
-        }
-
-        this.addChatMessage(botResponse, 'bot');
+        this.addChatHtml(this.renderStructuredResponse(data), 'bot');
       }
 
       status.textContent = '';
@@ -516,6 +510,119 @@ class AriaApp {
     chatHistory.scrollTop = chatHistory.scrollHeight;
   }
 
+  addChatHtml(html, sender) {
+    const chatHistory = document.getElementById('chat-history');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${sender}-message`;
+
+    const senderLabel = sender === 'user' ? 'You' : 'Aria';
+    messageDiv.innerHTML = `<strong>${senderLabel}:</strong>${html}`;
+
+    chatHistory.appendChild(messageDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
+
+  renderStructuredResponse(data) {
+    if (data.responseType === 'buildRecommendation') {
+      return this.renderBuildRecommendation(data);
+    }
+
+    if (data.responseType === 'flipRanking') {
+      return this.renderFlipRanking(data);
+    }
+
+    return this.renderChatAnswer(data);
+  }
+
+  renderChatAnswer(data) {
+    return `
+      <p>${this.escapeHtml(data.answer || data.summary || 'No response')}</p>
+      ${this.renderList('Key Points', data.keyPoints)}
+      ${this.renderList('Recommendations', data.recommendations)}
+      ${this.renderList('Warnings', data.warnings)}
+      ${this.renderList('Next Steps', data.nextSteps)}
+      ${this.renderResponseMeta(data)}
+    `;
+  }
+
+  renderBuildRecommendation(data) {
+    const build = data.build || {};
+    const gear = Array.isArray(build.gearSlots) ? build.gearSlots : [];
+    const consumables = Array.isArray(build.consumables) ? build.consumables : [];
+    const alternatives = Array.isArray(data.alternatives) ? data.alternatives : [];
+
+    return `
+      <p>${this.escapeHtml(data.summary || 'Build recommendation')}</p>
+      <h4>${this.escapeHtml([build.role, build.content, build.budget].filter(Boolean).join(' | '))}</h4>
+      ${gear.length ? `
+        <ul>
+          ${gear.map(slot => `<li><strong>${this.escapeHtml(slot.slot)}:</strong> ${this.escapeHtml(slot.item)} - ${this.escapeHtml(slot.reason)}</li>`).join('')}
+        </ul>
+      ` : ''}
+      ${consumables.length ? `
+        <h4>Food & Potion</h4>
+        <ul>
+          ${consumables.map(item => `<li><strong>${this.escapeHtml(item.type)}:</strong> ${this.escapeHtml(item.item)} - ${this.escapeHtml(item.reason)}</li>`).join('')}
+        </ul>
+      ` : ''}
+      ${this.renderList('Rotation', build.rotation)}
+      ${this.renderList('Budget Notes', build.budgetNotes)}
+      ${alternatives.length ? `
+        <h4>Alternatives</h4>
+        <ul>
+          ${alternatives.map(item => `<li><strong>${this.escapeHtml(item.item)}</strong> for ${this.escapeHtml(item.replaces)} - ${this.escapeHtml(item.reason)}</li>`).join('')}
+        </ul>
+      ` : ''}
+      ${this.renderList('Warnings', data.warnings)}
+      ${this.renderResponseMeta(data)}
+    `;
+  }
+
+  renderFlipRanking(data) {
+    const opportunities = Array.isArray(data.opportunities) ? data.opportunities : [];
+
+    return `
+      <p>${this.escapeHtml(data.summary || 'Flip ranking')}</p>
+      <p><strong>Budget:</strong> ${this.escapeHtml(data.budget || 'Unknown')}</p>
+      ${opportunities.length ? `
+        <ol>
+          ${opportunities.map(item => `
+            <li>
+              <strong>${this.escapeHtml(item.item)}</strong>:
+              buy ${this.escapeHtml(item.buyLocation)} at ${this.formatSilver(item.buyPrice)},
+              sell ${this.escapeHtml(item.sellLocation)} at ${this.formatSilver(item.sellPrice)}.
+              Profit ${this.formatSilver(item.estimatedProfit)} (${this.escapeHtml(String(item.profitMarginPercent))}%).
+              Risk: ${this.escapeHtml(item.transportRisk)}. ${this.escapeHtml(item.notes)}
+            </li>
+          `).join('')}
+        </ol>
+      ` : ''}
+      ${this.renderList('Warnings', data.warnings)}
+      ${this.renderResponseMeta(data)}
+    `;
+  }
+
+  renderList(title, items) {
+    if (!Array.isArray(items) || items.length === 0) return '';
+
+    return `
+      <h4>${this.escapeHtml(title)}</h4>
+      <ul>
+        ${items.map(item => `<li>${this.escapeHtml(String(item))}</li>`).join('')}
+      </ul>
+    `;
+  }
+
+  renderResponseMeta(data) {
+    if (!data.engine && !data.intent) return '';
+    return `<p><em>Engine: ${this.escapeHtml(data.engine || 'unknown')} | Intent: ${this.escapeHtml(data.intent || 'unknown')}</em></p>`;
+  }
+
+  formatSilver(value) {
+    if (!Number.isFinite(value)) return 'unknown';
+    return `${value.toLocaleString()} silver`;
+  }
+
   escapeHtml(text) {
     const map = {
       '&': '&amp;',
@@ -528,6 +635,12 @@ class AriaApp {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  new AriaApp();
-});
+function startAriaApp() {
+  window.ariaApp = new AriaApp();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startAriaApp);
+} else {
+  startAriaApp();
+}
