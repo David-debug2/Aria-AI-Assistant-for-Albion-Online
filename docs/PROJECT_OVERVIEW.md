@@ -4,65 +4,85 @@
 
 Aria is an AI-driven Albion Online strategy assistant. It combines:
 
-- a knowledge corpus of Albion gameplay and economy rules (`albion-brain/`)
+- a human-editable Albion knowledge corpus in `albion-brain/`
+- generated item, stat, spell, recipe, and embedding data in `data/`
 - live market data from Albion Data Project APIs
-- item resolution from official Albion item data
-- AI generation via Gemini or local Ollama
+- deterministic JavaScript calculations for market and crafting math
+- AI generation through user-supplied provider keys or server-configured fallback providers
 - a browser dashboard for chat, market tracking, crafting, and guild advice
 
-Aria is designed to help players answer questions like:
+Aria is designed to answer questions like:
 
 - "What is the best T5 sword for PvP?"
 - "Should I craft this item for profit?"
-- "What is the best territory strategy for my guild?"
+- "What ingredients do I need for this item?"
 - "What build should I use for ZvZ or dungeon play?"
+- "What is the best territory strategy for my guild?"
 
 ## Repo Structure
 
 ### Root files
 
-- `README.md` — Quick start, commands, and project overview
-- `package.json` — Node scripts, dependencies, and project metadata
-- `BRAIN.md` — Brain authoring guidelines for the AI knowledge corpus
-- `docs/` — Project documentation and architecture upgrade plan
+- `README.md` - quick start, commands, and API reference.
+- `package.json` - scripts, dependencies, and project metadata.
+- `BRAIN.md` - authoring guidelines for the AI knowledge corpus.
+- `.env.example` - example environment values.
+- `docs/` - documentation, version snapshots, and ADRs.
 
 ### `config/`
 
-- `config.js` — Application configuration values and environment defaults
+- `config.js` - server defaults, AI provider/model allowlists, market settings, and brain retrieval settings.
 
 ### `src/`
 
-- `server.js` — Express server and HTTP API routes
-- `ai-agent.js` — Main AI orchestration, engine selection, and prompt construction
-- `brain-loader.js` — Intent detection and brain file context loading
-- `market-api.js` — Live Albion market price and history lookup
-- `item-resolver.js` — Search and fuzzy resolution for Albion item names and IDs
-- `market-cache.js` — In-memory caching for market responses
+- `server.js` - Express app, HTTP routes, API validation, and error handling.
+- `ai-agent.js` - AI orchestration, provider routing, fallback chain, response schemas, and Gemini static cache support.
+- `brain-loader.js` - intent detection, markdown chunking, embedding retrieval, lexical fallback, and context assembly.
+- `schemas.js` - response schemas and validation helpers for AI output.
+- `openalbion-loader.js` - in-memory lookup indexes for generated OpenAlbion stats and spells.
+- `item-resolver.js` - fuzzy search for Albion item names and IDs.
+- `market-api.js` - Albion Data Project price/history client.
+- `market-cache.js` - in-memory market API response cache.
 
 ### `src/modules/`
 
-- `build-advisor.js` — Build recommendations and counter-build guidance
-- `crafting-profit.js` — Crafting profit calculator and cost breakdown logic
-- `guild-strategist.js` — Guild territory, ZvZ composition, and progression advice
-- `market-analyzer.js` — Market trend analysis and flip detection logic
+- `build-advisor.js` - build and counter-build prompts enriched with OpenAlbion data.
+- `calc-helpers.js` - shared margin, tax, percentage, and currency helpers.
+- `crafting-profit.js` - recipe loading, ingredient costing, taxes, silver fees, and profit calculations.
+- `guild-strategist.js` - deterministic guild territory, ZvZ, and progression advice.
+- `market-analyzer.js` - deterministic flip opportunity and trend calculations before AI narration.
 
 ### `public/`
 
-- `index.html` — Frontend entry point
-- `css/styles.css` — Styles for the dashboard UI
-- `js/app.js` — Browser-side UI behavior for chat and calculation features
+- `index.html` - frontend entry point and dashboard markup.
+- `css/styles.css` - dashboard styling.
+- `js/app.js` - browser behavior, session-only provider key storage, and API calls.
 
 ### `scripts/`
 
-- `fetch-items.js` — Data fetcher for Albion items used by the item resolver
+- `fetch-items.js` - generates `data/albion-items.json`.
+- `embed-brain.js` - generates `data/brain-embeddings.json`.
+- `fetch-openalbion.js` - generates OpenAlbion and Gameinfo data files.
 
 ### `data/`
 
-- `albion-items.json` — Generated Albion item database for fuzzy item resolution
+Generated local data used at runtime:
+
+- `albion-items.json`
+- `brain-embeddings.json`
+- `openalbion-lists.json`
+- `openalbion-weapon-stats.json`
+- `openalbion-armor-stats.json`
+- `openalbion-consumable-stats.json`
+- `openalbion-consumable-recipes.json`
+- `openalbion-spells.json`
+- `gameinfo-gear-recipes.json`
+
+These files are regenerable and ignored by git.
 
 ### `albion-brain/`
 
-Contains the knowledge corpus used to answer player questions. Files are grouped by topic:
+The human-editable knowledge corpus:
 
 - `1_basics_progression.md`
 - `2_world_zones_mists.md`
@@ -76,32 +96,37 @@ Contains the knowledge corpus used to answer player questions. Files are grouped
 
 ## Core Architecture
 
-### Request flow
+### Chat request flow
 
-1. Client sends a request to `src/server.js`
-2. `server.js` validates input and forwards chat queries to `src/ai-agent.js`
-3. `ai-agent.js` calls `src/brain-loader.js` to determine intent and load relevant brain context
-4. If present, `src/market-api.js` provides live market price or history data
-5. `ai-agent.js` constructs the final prompt and sends it to Gemini or Ollama
-6. The generated response is returned back to the client
+1. The browser stores provider settings in `sessionStorage`.
+2. The client sends `/api/ask` with `X-Provider`, `X-Model`, and `X-Provider-Key`.
+3. `server.js` validates the provider/model against `config/config.js`.
+4. `ai-agent.js` asks `brain-loader.js` for relevant knowledge context.
+5. `brain-loader.js` uses embedding retrieval when generated embeddings are available and lexical chunk scoring as fallback.
+6. Optional market data is fetched through `market-api.js`.
+7. The AI provider returns JSON matching the expected response type.
+8. `schemas.js` validates the response before the server sends it to the browser.
 
-### Knowledge & AI context
+### Knowledge and retrieval
 
-- `albion-brain/` stores the static game knowledge used by the AI
-- `BRAIN.md` explains how those files should be authored and maintained
-- `brain-loader.js` uses intent detection to choose which brain files to include in each query
+- `albion-brain/` contains stable player-facing knowledge.
+- `brain-loader.js` parses those files into markdown sections.
+- `scripts/embed-brain.js` can generate semantic vectors for those sections.
+- Missing embeddings do not stop the app; lexical chunk scoring remains the fallback.
+
+### Generated game data
+
+- `scripts/fetch-openalbion.js` fetches real stats, spells, consumables, and recipes.
+- `openalbion-loader.js` indexes stats and spells in memory.
+- `crafting-profit.js` loads generated consumable and gear recipes.
+- Brain files keep concise reference tables and strategy notes; generated data handles large raw data.
 
 ### Live market support
 
-- `market-api.js` resolves item names via `item-resolver.js`
-- It then queries Albion Data Project endpoints for prices and history
-- Responses are cached in `market-cache.js` for performance
-
-### Crafting and guild features
-
-- `crafting-profit.js` computes profit/loss estimates for item crafting
-- `build-advisor.js` provides build and counter-build guidance
-- `guild-strategist.js` offers territory strategy and ZvZ composition recommendations
+- `market-api.js` resolves item names through `item-resolver.js`.
+- It queries Albion Data Project endpoints for prices and history.
+- `market-cache.js` caches recent market responses for performance.
+- `market-analyzer.js` computes flip and trend math before asking the AI for narration.
 
 ## Key Developer Workflows
 
@@ -111,13 +136,15 @@ Contains the knowledge corpus used to answer player questions. Files are grouped
 npm install
 ```
 
-### Fetch item data
+### Generate data
 
 ```bash
-node scripts/fetch-items.js
+npm run fetch-items
+npm run fetch-openalbion
+npm run embed-brain
 ```
 
-This script generates `data/albion-items.json`, which is required for item name resolution.
+Re-run `fetch-items` and `fetch-openalbion` after Albion patches. Re-run `embed-brain` after meaningful brain file edits.
 
 ### Run the app
 
@@ -133,30 +160,17 @@ Then open `http://localhost:3000`.
 npm test
 ```
 
-### Review brain content
+## Documentation Map
 
-- Use `BRAIN.md` before editing `albion-brain/*.md`
-- Keep the corpus focused, concise, and under the project token budget
+- `docs/CHANGELOG.md` records what changed by version.
+- `docs/versions/ALPHA.md` and `docs/versions/BETA.md` are frozen version snapshots.
+- `docs/decisions/` records why major technical choices were made.
+- `docs/HOW-TO-UPDATE-DOCS.md` explains what to update when shipping changes.
 
-## Where to find the upgrade plan
+## Notes for New Developers
 
-The current architecture upgrade plan is stored in:
-
-- `docs/aria-architecture-upgrade-plan.md`
-
-That document describes planned changes for the brain loader, AI routing, SDK migration, caching, provider fallbacks, and OpenAlbion data enrichment.
-
-## Notes for new developers
-
-- The app is intentionally modular: AI orchestration lives in `src/ai-agent.js`, while domain-specific logic is in `src/modules/`
-- The knowledge corpus is separate from runtime code so the AI can stay up-to-date without code changes
-- Live market data is optional but adds concrete, price-aware answers to the AI responses
-- The `docs/` folder is the primary place for architecture documentation and planned changes
-
-## Suggested onboarding path
-
-1. Read `README.md` for setup and quick start
-2. Read `docs/PROJECT_OVERVIEW.md` for repo structure and architecture
-3. Read `BRAIN.md` if you need to edit game knowledge
-4. Read `docs/aria-architecture-upgrade-plan.md` for the current roadmap
-5. Explore `src/server.js` and `src/ai-agent.js` to understand request flow
+- The app is intentionally modular: AI orchestration is in `src/ai-agent.js`, while domain logic lives in `src/modules/`.
+- User API keys are not stored server-side; they are sent per request from browser session storage.
+- Generated data should be refreshed with scripts, not manually edited.
+- Brain files are still the source of concise human-authored Albion strategy knowledge.
+- Beta left one known technical debt item: the code still uses `@google/generative-ai`.

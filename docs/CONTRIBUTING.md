@@ -122,28 +122,35 @@ cd Aria
 # 2. Install all dependencies (third-party packages)
 npm install
 
-# 3. Download the Albion item database (10,000+ items)
-node scripts/fetch-items.js
+# 3. Download generated Albion data
+npm run fetch-items
+npm run fetch-openalbion
 
-# 4. Create your personal config file
+# 4. Generate semantic brain retrieval data
+npm run embed-brain
+
+# 5. Create your personal config file
 # Copy .env.example to .env (or create .env manually)
-# Add your Google API key:
+# Add provider keys you use for local/server-configured paths:
 #   GOOGLE_API_KEY=your_key_here
-#   AI_MODEL=gemini
+#   OPENROUTER_API_KEY=optional_server_key
+#   CLOUDFLARE_API_TOKEN=optional_server_token
+#   CLOUDFLARE_ACCOUNT_ID=optional_account_id
 #   PORT=3000
 
-# 5. Start the server
+# 6. Start the server
 npm start
 
-# 6. Open your browser and go to:
+# 7. Open your browser and go to:
 #    http://localhost:3000
+#    Then enter provider/model/API key settings in the UI.
 ```
 
 ### Verify it's working
 
 - The chat tab should load and show a welcome message from Aria
-- Type "What's the best T5 sword for PvP?" and you should get an answer
-- If you see an error about the API key, check your `.env` file
+- Type "What's the best T5 sword for PvP?" and you should get an answer after provider settings are configured
+- If you see an error about provider settings, confirm the UI has a provider, model, and API key selected
 
 ### Run the tests
 
@@ -151,7 +158,7 @@ npm start
 npm test
 ```
 
-All tests should pass on a fresh setup. If any fail, check that `data/albion-items.json` exists (step 3 above).
+All tests should pass on a fresh setup. If data-dependent behavior fails outside tests, check that the generated files in `data/` exist.
 
 ### Suggested reading order (for new devs)
 1. `README.md` — quick overview and API reference

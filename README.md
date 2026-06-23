@@ -43,7 +43,7 @@ An AI-powered strategy advisor for **Albion Online** players. Aria combines Clau
 - Node.js 18+
 - npm or yarn
 - Albion Data Project API access (free, public)
-- Claude API key (optional, for premium AI)
+- User API key for OpenRouter, OpenAI, Anthropic, or Gemini
 - Ollama (optional, for offline LLM mode)
 
 ### Quick Start
@@ -58,10 +58,12 @@ An AI-powered strategy advisor for **Albion Online** players. Aria combines Clau
    ```bash
    npm run fetch-items
    npm run fetch-openalbion
+   npm run embed-brain
    ```
    The first command downloads 10K+ items from the Albion community data repository.
    The second command downloads OpenAlbion stats, spells, consumable recipes, and Gameinfo gear recipes.
-   Re-run both commands after Albion Online patches so local item, stat, spell, and recipe data stays current.
+   The third command generates semantic retrieval data for the brain files.
+   Re-run the data fetch commands after Albion Online patches, and re-run embeddings after meaningful brain file edits.
 
 3. **Configure Environment** (`.env`)
    ```bash
@@ -107,10 +109,24 @@ Ask Aria anything about Albion Online.
 **Response:**
 ```json
 {
-  "response": "For T5 PvP, the claymore with...",
+  "responseType": "buildRecommendation",
+  "summary": "For T5 PvP, use a sword build focused on mobility and burst windows.",
+  "build": {
+    "role": "melee DPS",
+    "content": "PvP",
+    "budget": "T5",
+    "gearSlots": [
+      { "slot": "weapon", "item": "T5 Sword", "reason": "Reliable pressure and mobility." }
+    ],
+    "consumables": [],
+    "rotation": [],
+    "budgetNotes": []
+  },
+  "alternatives": [],
+  "warnings": [],
+  "engine": "openrouter:meta-llama/llama-3.1-8b-instruct",
   "intent": "build",
-  "engine": "claude",
-  "knowledgeFiles": ["8_weapons_armor.md"]
+  "filesLoaded": ["8_weapons_armor.md"]
 }
 ```
 
@@ -195,9 +211,19 @@ Calculate profit/loss for crafting an item.
   "breakdown": {
     "ingredientCost": 1000000,
     "craftingTax": 80000,
+    "silverFee": 0,
     "enchantmentCost": 0,
     "totalCost": 1080000,
-    "sellPrice": 1260000
+    "sellPrice": 1260000,
+    "ingredients": [
+      {
+        "id": "T5_METALBAR",
+        "name": "T5_METALBAR",
+        "quantity": 16,
+        "unitPrice": 62500,
+        "total": 1000000
+      }
+    ]
   }
 }
 ```
