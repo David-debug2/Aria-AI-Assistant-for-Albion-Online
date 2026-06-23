@@ -1,5 +1,6 @@
 require('dotenv').config({ quiet: true });
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleAICacheManager } = require('@google/generative-ai/server');
 const { loadBrainContext } = require('./brain-loader');
 const {
   getResponseSchema,
@@ -21,6 +22,34 @@ You have been given a knowledge base about the game. Always prioritize informati
 When live market data is included, analyze it concretely: give specific item names, exact silver values, and ranked recommendations.
 Be direct and specific. Avoid vague advice.
 Return only valid JSON matching the response schema. Do not wrap JSON in Markdown fences.`;
+
+const STATIC_REFERENCE_CONTEXT = `Static Albion reference tables:
+
+Crafting tax rates by simplified recipe tier:
+- T4 sword/helmet: 8%
+- T5 sword/helmet: 9%
+- T6 sword/helmet: 10%
+
+Enchantment cost estimates:
+- .0: 0 silver
+- .1: 50,000 silver
+- .2: 500,000 silver
+- .3: 5,000,000 silver
+
+Territory tax and requirement references:
+- Residential territory: 5% tax, 50,000-100,000 weekly income, 15 minimum members, 100,000 minimum treasury
+- Industrial territory: 10% tax, 100,000-200,000 weekly income, 25 minimum members, 500,000 minimum treasury
+- Commercial territory: 15% tax, 150,000-300,000 weekly income, 40 minimum members, 2,000,000 minimum treasury
+
+ZvZ preparation cost estimates:
+- Small scale: about 350,000 silver
+- Medium scale: about 900,000 silver
+- Large scale: about 2,800,000 silver`;
+
+const GEMINI_CACHE_TTL_SECONDS = Number(process.env.GEMINI_CACHE_TTL_SECONDS || 3600);
+const GEMINI_CACHE_REFRESH_BUFFER_MS = 60 * 1000;
+const geminiCacheManager = process.env.GOOGLE_API_KEY ? new GoogleAICacheManager(process.env.GOOGLE_API_KEY) : null;
+const geminiStaticCaches = new Map();
 
 class MalformedModelOutputError extends Error {
   constructor(message, details = []) {
@@ -120,13 +149,86 @@ function parseAndValidateModelJson(text, responseType) {
   return parsed;
 }
 
-async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswer') {
-  if (!genAI) {
-    throw new Error('GOOGLE_API_KEY is not configured');
-  }
+function isCacheExpiredOrNearExpiry(cachedContent) {
+  if (!cachedContent?.expireTime) return false;
+  const expireTime = Date.parse(cachedContent.expireTime);
+  return Number.isFinite(expireTime) && expireTime <= Date.now() + GEMINI_CACHE_REFRESH_BUFFER_MS;
+}
 
-  // Passing systemInstruction cleanly into the model instance configuration
-  const geminiModel = genAI.getGenerativeModel({ 
+function isCacheError(err) {
+  const message = String(err?.message || err || '').toLowerCase();
+  return (
+    message.includes('cachedcontent') ||
+    message.includes('cached content') ||
+    message.includes('cache') ||
+    message.includes('expired') ||
+    message.includes('not found')
+  );
+}
+
+async function createGeminiStaticCache(model) {
+  if (!geminiCacheManager) return null;
+
+  const cachedContent = await geminiCacheManager.create({
+    model,
+    displayName: `aria-static-context-${model}`,
+    systemInstruction: SYSTEM_PROMPT,
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: STATIC_REFERENCE_CONTEXT }],
+      },
+    ],
+    ttlSeconds: GEMINI_CACHE_TTL_SECONDS,
+  });
+
+  console.log(`Gemini static context cache ready: ${cachedContent.name} (${model})`);
+  return cachedContent;
+}
+
+async function loadConfiguredGeminiStaticCache(model) {
+  const configuredName = process.env.GEMINI_STATIC_CACHE_NAME;
+  if (!geminiCacheManager || !configuredName) return null;
+
+  const cachedContent = await geminiCacheManager.get(configuredName);
+  const cachedModel = String(cachedContent.model || '').replace(/^models\//, '');
+  if (cachedModel && cachedModel !== model) return null;
+  return cachedContent;
+}
+
+function startGeminiStaticCache(model, forceRefresh = false) {
+  if (!geminiCacheManager) return Promise.resolve(null);
+
+  const existing = geminiStaticCaches.get(model);
+  if (existing && !forceRefresh) return existing.promise;
+
+  const promise = (async () => {
+    try {
+      const configuredCache = forceRefresh ? null : await loadConfiguredGeminiStaticCache(model);
+      const cachedContent = configuredCache || await createGeminiStaticCache(model);
+      geminiStaticCaches.set(model, { cachedContent, promise: Promise.resolve(cachedContent) });
+      return cachedContent;
+    } catch (err) {
+      geminiStaticCaches.delete(model);
+      console.warn(`Gemini static context cache unavailable for ${model}:`, err.message);
+      return null;
+    }
+  })();
+
+  geminiStaticCaches.set(model, { cachedContent: null, promise });
+  return promise;
+}
+
+async function getGeminiStaticCache(model) {
+  const cached = await startGeminiStaticCache(model);
+  if (!cached || isCacheExpiredOrNearExpiry(cached)) {
+    return startGeminiStaticCache(model, true);
+  }
+  return cached;
+}
+
+function getUncachedGeminiModel(model, responseType) {
+  return genAI.getGenerativeModel({
     model,
     systemInstruction: SYSTEM_PROMPT,
     generationConfig: {
@@ -134,8 +236,52 @@ async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswe
       responseSchema: getResponseSchema(responseType),
     },
   });
-  
-  const result = await geminiModel.generateContent(prompt);
+}
+
+async function getCachedGeminiModel(model, responseType) {
+  const cachedContent = await getGeminiStaticCache(model);
+  if (!cachedContent) return getUncachedGeminiModel(model, responseType);
+
+  return genAI.getGenerativeModelFromCachedContent(cachedContent, {
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: getResponseSchema(responseType),
+    },
+  });
+}
+
+function logGeminiUsageMetadata(result, model) {
+  const usageMetadata = result?.response?.usageMetadata;
+  if (!usageMetadata) return;
+
+  console.log('Gemini usageMetadata:', JSON.stringify({
+    model,
+    promptTokenCount: usageMetadata.promptTokenCount,
+    candidatesTokenCount: usageMetadata.candidatesTokenCount,
+    totalTokenCount: usageMetadata.totalTokenCount,
+    cachedContentTokenCount: usageMetadata.cachedContentTokenCount || 0,
+  }));
+}
+
+async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswer') {
+  if (!genAI) {
+    throw new Error('GOOGLE_API_KEY is not configured');
+  }
+
+  let geminiModel = await getCachedGeminiModel(model, responseType);
+  let result;
+  try {
+    result = await geminiModel.generateContent(prompt);
+  } catch (err) {
+    if (!isCacheError(err)) throw err;
+
+    console.warn(`Gemini static context cache failed for ${model}; refreshing and retrying:`, err.message);
+    geminiStaticCaches.delete(model);
+    geminiModel = await getCachedGeminiModel(model, responseType);
+    result = await geminiModel.generateContent(prompt);
+  }
+
+  logGeminiUsageMetadata(result, model);
   return parseAndValidateModelJson(result.response.text(), responseType);
 }
 
@@ -273,6 +419,12 @@ async function askOllama(prompt, modelOverride = null) {
   } catch (err) {
     console.warn('Ollama unavailable:', err.message);
     return null;
+  }
+}
+
+if (geminiCacheManager) {
+  for (const model of new Set([GEMINI_FLASH, GEMINI_PRO])) {
+    startGeminiStaticCache(model);
   }
 }
 
