@@ -38,6 +38,21 @@ When live market data is included, analyze it concretely: give specific item nam
 Be direct and specific. Avoid vague advice.
 Return only valid JSON matching the response schema. Do not wrap JSON in Markdown fences.`;
 
+const INTENT_REASONING_INSTRUCTIONS = {
+  build: `For build requests, use this visible reasoning order before finalizing the JSON fields:
+1. Identify the frontline/backline/support role, content type, and win condition.
+2. Choose weapon and armor around that role before selecting cape, food, potion, and budget alternatives.
+3. Explain each gear reason as a short cause-and-effect tactical note, then keep the final gear list concrete.`,
+  pvp: `For PvP counter-build requests, use this visible reasoning order before finalizing the JSON fields:
+1. Identify the enemy build's main pressure, defense, mobility, and likely cooldown pattern.
+2. Explain the countering mechanic first: purge, interrupt, reflect, kite, burst window, cleanse, or sustain denial.
+3. Then provide the final gear list and rotation that exploit that mechanic.`,
+  guild: `For guild strategy requests, use this visible reasoning order before finalizing the JSON fields:
+1. Classify the objective as economy, territory, ZvZ, recruitment, logistics, or diplomacy.
+2. Sequence recommendations from frontline requirements to backline/support requirements to gear swaps and logistics.
+3. Call out dependencies, risks, and next operational steps in priority order.`,
+};
+
 const STATIC_REFERENCE_CONTEXT = `Static Albion reference tables:
 
 Crafting tax rates by simplified recipe tier:
@@ -113,7 +128,7 @@ async function ask(query, liveData = null, forceIntent = null, aiOptions = null)
   const userMessage = `${context}${liveSection}\n\n---\n\nPLAYER QUESTION:\n${query}${getResponseInstructions(responseType)}`;
 
   if (aiOptions) {
-    const response = await askProvider(userMessage, aiOptions, responseType);
+    const response = await askProvider(userMessage, aiOptions, responseType, intent);
     return {
       responseType,
       response,
@@ -138,6 +153,13 @@ function chooseEngine(intent, prompt) {
 
 function getResponseInstructions(responseType) {
   return `\n\nReturn JSON for responseType "${responseType}". All required fields must be present. Use empty arrays when there are no items.`;
+}
+
+function getSystemPrompt(intent = null) {
+  const intentInstructions = INTENT_REASONING_INSTRUCTIONS[intent];
+  return intentInstructions
+    ? `${SYSTEM_PROMPT}\n\n${intentInstructions}`
+    : SYSTEM_PROMPT;
 }
 
 function getLocalDayKey(now = new Date()) {
@@ -184,19 +206,19 @@ async function askFallbackChain(prompt, responseType, intent) {
   const chain = [
     {
       engine: 'openrouter',
-      call: () => providerRuntime.askOpenRouter(prompt, OPENROUTER_MODEL, undefined, responseType),
+      call: () => providerRuntime.askOpenRouter(prompt, OPENROUTER_MODEL, undefined, responseType, intent),
     },
     {
       engine: 'cloudflare',
-      call: () => providerRuntime.askCloudflare(prompt, CLOUDFLARE_MODEL, undefined, undefined, responseType),
+      call: () => providerRuntime.askCloudflare(prompt, CLOUDFLARE_MODEL, undefined, undefined, responseType, intent),
     },
     {
       engine: 'ollama',
-      call: () => providerRuntime.askOllama(prompt, ollamaModel),
+      call: () => providerRuntime.askOllama(prompt, ollamaModel, intent),
     },
     {
       engine: 'gemini-flash',
-      call: () => providerRuntime.askGemini(prompt, GEMINI_FLASH, responseType),
+      call: () => providerRuntime.askGemini(prompt, GEMINI_FLASH, responseType, intent),
     },
   ];
 
@@ -266,13 +288,17 @@ function isCacheError(err) {
   );
 }
 
-async function createGeminiStaticCache(model) {
+function getGeminiCacheKey(model, systemPrompt) {
+  return `${model}:${systemPrompt}`;
+}
+
+async function createGeminiStaticCache(model, systemPrompt = SYSTEM_PROMPT) {
   if (!geminiCacheManager) return null;
 
   const cachedContent = await geminiCacheManager.create({
     model,
     displayName: `aria-static-context-${model}`,
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: systemPrompt,
     contents: [
       {
         role: 'user',
@@ -286,9 +312,9 @@ async function createGeminiStaticCache(model) {
   return cachedContent;
 }
 
-async function loadConfiguredGeminiStaticCache(model) {
+async function loadConfiguredGeminiStaticCache(model, systemPrompt = SYSTEM_PROMPT) {
   const configuredName = process.env.GEMINI_STATIC_CACHE_NAME;
-  if (!geminiCacheManager || !configuredName) return null;
+  if (!geminiCacheManager || !configuredName || systemPrompt !== SYSTEM_PROMPT) return null;
 
   const cachedContent = await geminiCacheManager.get(configuredName);
   const cachedModel = String(cachedContent.model || '').replace(/^models\//, '');
@@ -296,41 +322,42 @@ async function loadConfiguredGeminiStaticCache(model) {
   return cachedContent;
 }
 
-function startGeminiStaticCache(model, forceRefresh = false) {
+function startGeminiStaticCache(model, forceRefresh = false, systemPrompt = SYSTEM_PROMPT) {
   if (!geminiCacheManager) return Promise.resolve(null);
 
-  const existing = geminiStaticCaches.get(model);
+  const cacheKey = getGeminiCacheKey(model, systemPrompt);
+  const existing = geminiStaticCaches.get(cacheKey);
   if (existing && !forceRefresh) return existing.promise;
 
   const promise = (async () => {
     try {
-      const configuredCache = forceRefresh ? null : await loadConfiguredGeminiStaticCache(model);
-      const cachedContent = configuredCache || await createGeminiStaticCache(model);
-      geminiStaticCaches.set(model, { cachedContent, promise: Promise.resolve(cachedContent) });
+      const configuredCache = forceRefresh ? null : await loadConfiguredGeminiStaticCache(model, systemPrompt);
+      const cachedContent = configuredCache || await createGeminiStaticCache(model, systemPrompt);
+      geminiStaticCaches.set(cacheKey, { cachedContent, promise: Promise.resolve(cachedContent) });
       return cachedContent;
     } catch (err) {
-      geminiStaticCaches.delete(model);
+      geminiStaticCaches.delete(cacheKey);
       console.warn(`Gemini static context cache unavailable for ${model}:`, err.message);
       return null;
     }
   })();
 
-  geminiStaticCaches.set(model, { cachedContent: null, promise });
+  geminiStaticCaches.set(cacheKey, { cachedContent: null, promise });
   return promise;
 }
 
-async function getGeminiStaticCache(model) {
-  const cached = await startGeminiStaticCache(model);
+async function getGeminiStaticCache(model, systemPrompt = SYSTEM_PROMPT) {
+  const cached = await startGeminiStaticCache(model, false, systemPrompt);
   if (!cached || isCacheExpiredOrNearExpiry(cached)) {
-    return startGeminiStaticCache(model, true);
+    return startGeminiStaticCache(model, true, systemPrompt);
   }
   return cached;
 }
 
-function getUncachedGeminiModel(model, responseType) {
+function getUncachedGeminiModel(model, responseType, systemPrompt = SYSTEM_PROMPT) {
   return genAI.getGenerativeModel({
     model,
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: systemPrompt,
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: getResponseSchema(responseType),
@@ -338,9 +365,9 @@ function getUncachedGeminiModel(model, responseType) {
   });
 }
 
-async function getCachedGeminiModel(model, responseType) {
-  const cachedContent = await getGeminiStaticCache(model);
-  if (!cachedContent) return getUncachedGeminiModel(model, responseType);
+async function getCachedGeminiModel(model, responseType, systemPrompt = SYSTEM_PROMPT) {
+  const cachedContent = await getGeminiStaticCache(model, systemPrompt);
+  if (!cachedContent) return getUncachedGeminiModel(model, responseType, systemPrompt);
 
   return genAI.getGenerativeModelFromCachedContent(cachedContent, {
     generationConfig: {
@@ -363,12 +390,13 @@ function logGeminiUsageMetadata(result, model) {
   }));
 }
 
-async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswer') {
+async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswer', intent = null) {
   if (!genAI) {
     throw new Error('GOOGLE_API_KEY is not configured');
   }
 
-  let geminiModel = await getCachedGeminiModel(model, responseType);
+  const systemPrompt = getSystemPrompt(intent);
+  let geminiModel = await getCachedGeminiModel(model, responseType, systemPrompt);
   let result;
   try {
     result = await geminiModel.generateContent(prompt);
@@ -376,8 +404,8 @@ async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswe
     if (!isCacheError(err)) throw err;
 
     console.warn(`Gemini static context cache failed for ${model}; refreshing and retrying:`, err.message);
-    geminiStaticCaches.delete(model);
-    geminiModel = await getCachedGeminiModel(model, responseType);
+    geminiStaticCaches.delete(getGeminiCacheKey(model, systemPrompt));
+    geminiModel = await getCachedGeminiModel(model, responseType, systemPrompt);
     result = await geminiModel.generateContent(prompt);
   }
 
@@ -385,15 +413,15 @@ async function askGemini(prompt, model = GEMINI_FLASH, responseType = 'chatAnswe
   return parseAndValidateModelJson(result.response.text(), responseType);
 }
 
-async function askProvider(prompt, { provider, model, apiKey }, responseType = 'chatAnswer') {
+async function askProvider(prompt, { provider, model, apiKey }, responseType = 'chatAnswer', intent = null) {
   if (provider === 'openrouter') {
-    const text = await askOpenRouter(prompt, model, apiKey, responseType);
+    const text = await askOpenRouter(prompt, model, apiKey, responseType, intent);
     if (!text) throw new Error('OpenRouter unavailable');
     return parseAndValidateModelJson(text, responseType);
   }
-  if (provider === 'openai') return askOpenAI(prompt, model, apiKey, responseType);
-  if (provider === 'anthropic') return askAnthropic(prompt, model, apiKey, responseType);
-  if (provider === 'gemini') return askGeminiWithKey(prompt, model, apiKey, responseType);
+  if (provider === 'openai') return askOpenAI(prompt, model, apiKey, responseType, intent);
+  if (provider === 'anthropic') return askAnthropic(prompt, model, apiKey, responseType, intent);
+  if (provider === 'gemini') return askGeminiWithKey(prompt, model, apiKey, responseType, intent);
 
   throw new Error('Unsupported AI provider');
 }
@@ -433,10 +461,11 @@ async function postJson(url, { headers, body }) {
   return data;
 }
 
-async function askOpenRouter(prompt, model, apiKey, responseType = 'chatAnswer') {
+async function askOpenRouter(prompt, model, apiKey, responseType = 'chatAnswer', intent = null) {
   const resolvedApiKey = apiKey || process.env.OPENROUTER_API_KEY;
   const resolvedModel = model || OPENROUTER_MODEL;
   const usesEnvQuota = !apiKey;
+  const systemPrompt = getSystemPrompt(intent);
 
   if (!resolvedApiKey) return null;
   if (usesEnvQuota && !isOpenRouterQuotaAvailable()) {
@@ -456,7 +485,7 @@ async function askOpenRouter(prompt, model, apiKey, responseType = 'chatAnswer')
       body: {
         model: resolvedModel,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' }
@@ -474,10 +503,11 @@ async function askOpenRouter(prompt, model, apiKey, responseType = 'chatAnswer')
   }
 }
 
-async function askCloudflare(prompt, model, apiToken, accountId, responseType = 'chatAnswer') {
+async function askCloudflare(prompt, model, apiToken, accountId, responseType = 'chatAnswer', intent = null) {
   const resolvedApiToken = apiToken || process.env.CLOUDFLARE_API_TOKEN;
   const resolvedAccountId = accountId || process.env.CLOUDFLARE_ACCOUNT_ID;
   const resolvedModel = model || CLOUDFLARE_MODEL;
+  const systemPrompt = getSystemPrompt(intent);
 
   if (!resolvedApiToken || !resolvedAccountId) return null;
 
@@ -489,7 +519,7 @@ async function askCloudflare(prompt, model, apiToken, accountId, responseType = 
       body: {
         model: resolvedModel,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' }
@@ -507,13 +537,14 @@ async function askCloudflare(prompt, model, apiToken, accountId, responseType = 
   }
 }
 
-async function askOpenAI(prompt, model, apiKey, responseType = 'chatAnswer') {
+async function askOpenAI(prompt, model, apiKey, responseType = 'chatAnswer', intent = null) {
+  const systemPrompt = getSystemPrompt(intent);
   const data = await postJson('https://api.openai.com/v1/chat/completions', {
     headers: { Authorization: `Bearer ${apiKey}` },
     body: {
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
       ],
       response_format: { type: 'json_object' }
@@ -523,7 +554,8 @@ async function askOpenAI(prompt, model, apiKey, responseType = 'chatAnswer') {
   return parseAndValidateModelJson(data?.choices?.[0]?.message?.content || '', responseType);
 }
 
-async function askAnthropic(prompt, model, apiKey, responseType = 'chatAnswer') {
+async function askAnthropic(prompt, model, apiKey, responseType = 'chatAnswer', intent = null) {
+  const systemPrompt = getSystemPrompt(intent);
   const data = await postJson('https://api.anthropic.com/v1/messages', {
     headers: {
       'x-api-key': apiKey,
@@ -532,7 +564,7 @@ async function askAnthropic(prompt, model, apiKey, responseType = 'chatAnswer') 
     body: {
       model,
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: prompt }]
     }
   });
@@ -545,11 +577,12 @@ async function askAnthropic(prompt, model, apiKey, responseType = 'chatAnswer') 
   return parseAndValidateModelJson(content, responseType);
 }
 
-async function askGeminiWithKey(prompt, model, apiKey, responseType = 'chatAnswer') {
+async function askGeminiWithKey(prompt, model, apiKey, responseType = 'chatAnswer', intent = null) {
   const userGenAI = new GoogleGenerativeAI(apiKey);
+  const systemPrompt = getSystemPrompt(intent);
   const geminiModel = userGenAI.getGenerativeModel({
     model,
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: systemPrompt,
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: getResponseSchema(responseType),
@@ -560,16 +593,17 @@ async function askGeminiWithKey(prompt, model, apiKey, responseType = 'chatAnswe
   return parseAndValidateModelJson(result.response.text(), responseType);
 }
 
-async function askOllama(prompt, modelOverride = null) {
+async function askOllama(prompt, modelOverride = null, intent = null) {
   try {
     const { default: ollama } = await import('ollama');
     const model = modelOverride || process.env.OLLAMA_MODEL || 'qwen3.6';
+    const systemPrompt = getSystemPrompt(intent);
 
     // Injecting system context cleanly into the messages array layout
     const res = await ollama.chat({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
       ],
     });
@@ -595,6 +629,7 @@ module.exports = {
   askOpenAI,
   askAnthropic,
   askGeminiWithKey,
+  getSystemPrompt,
   MalformedModelOutputError,
   ProviderRequestError,
   ProviderChainError,

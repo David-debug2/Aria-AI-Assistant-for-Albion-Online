@@ -62,6 +62,27 @@ function stubBrain(intent = 'summarize') {
 }
 
 test('AI provider fallback chain', async (t) => {
+  await t.test('reasoning instructions are conditional by intent', async () => {
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
+    try {
+      const summarizePrompt = aiAgent.getSystemPrompt('summarize');
+      const buildPrompt = aiAgent.getSystemPrompt('build');
+      const pvpPrompt = aiAgent.getSystemPrompt('pvp');
+      const guildPrompt = aiAgent.getSystemPrompt('guild');
+
+      assert.doesNotMatch(summarizePrompt, /visible reasoning order/);
+      assert.doesNotMatch(summarizePrompt, /frontline\/backline\/support/);
+      assert.match(buildPrompt, /For build requests/);
+      assert.match(buildPrompt, /frontline\/backline\/support/);
+      assert.match(pvpPrompt, /For PvP counter-build requests/);
+      assert.match(pvpPrompt, /countering mechanic first/);
+      assert.match(guildPrompt, /For guild strategy requests/);
+      assert.match(guildPrompt, /frontline requirements/);
+    } finally {
+      cleanup();
+    }
+  });
+
   await t.test('first provider success returns OpenRouter engine metadata', async () => {
     const calls = [];
     const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
