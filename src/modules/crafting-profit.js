@@ -3,6 +3,7 @@
 
 const { resolveItem } = require('../item-resolver');
 const { getPrices } = require('../market-api');
+const { calculateMargin, formatMarginPercent, roundCurrency } = require('./calc-helpers');
 
 // Simplified crafting recipes (ingredient requirements by item ID patterns)
 // In production, this would come from a comprehensive recipe database
@@ -125,10 +126,6 @@ async function calculateCraftingProfit(itemQuery, options = {}) {
       };
     }
 
-    // Step 6: Calculate taxes and profit
-    const craftingTax = ingredientCost * recipe.tax;
-    const totalCost = ingredientCost + craftingTax;
-
     // Enchantment cost (rough estimate)
     let enchantmentCost = 0;
     if (enchantmentLevel > 0) {
@@ -137,29 +134,35 @@ async function calculateCraftingProfit(itemQuery, options = {}) {
       enchantmentCost = enchantmentCosts[Math.min(enchantmentLevel, 3)] || 0;
     }
 
-    const grossProfit = sellPrice - totalCost - enchantmentCost;
-    const profitMargin = (grossProfit / totalCost * 100).toFixed(2);
-    const profitsPerHour = Math.floor((grossProfit / (recipe.craftingTime / 3600)) / 1000) * 1000; // Rounded
+    // Step 6: Calculate taxes and profit
+    const margin = calculateMargin({
+      cost: ingredientCost,
+      revenue: sellPrice,
+      taxRate: recipe.tax,
+      taxBase: 'cost',
+      extraCost: enchantmentCost,
+    });
+    const profitsPerHour = Math.floor((margin.profit / (recipe.craftingTime / 3600)) / 1000) * 1000; // Rounded
 
     return {
       success: true,
       item: itemName,
       itemId,
-      profit: Math.floor(grossProfit),
-      profitMargin: `${profitMargin}%`,
+      profit: roundCurrency(margin.profit),
+      profitMargin: formatMarginPercent(margin.margin),
       profitsPerHour,
       breakdown: {
-        ingredientCost: Math.floor(ingredientCost),
-        craftingTax: Math.floor(craftingTax),
-        enchantmentCost: Math.floor(enchantmentCost),
-        totalCost: Math.floor(totalCost),
-        sellPrice: Math.floor(sellPrice),
+        ingredientCost: roundCurrency(ingredientCost),
+        craftingTax: roundCurrency(margin.tax),
+        enchantmentCost: roundCurrency(enchantmentCost),
+        totalCost: roundCurrency(margin.totalCost),
+        sellPrice: roundCurrency(sellPrice),
         ingredients: ingredientBreakdown,
       },
       recommendation:
-        grossProfit > 100000
+        margin.profit > 100000
           ? '✅ Good profit opportunity!'
-          : grossProfit > 0
+          : margin.profit > 0
           ? '⚠️ Marginal profit, risky'
           : '❌ Loss-making, avoid',
       server,
