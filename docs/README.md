@@ -1,18 +1,28 @@
 # Aria Documentation
 
-This folder contains the documentation for the Aria project.
+This folder contains all documentation for the Aria project.
 
-## Available Docs
+## Start here
+- `HOW-TO-DOCUMENT.md` — explains this folder's structure and when to update each file
+- `PROJECT_OVERVIEW.md` — what Aria is, how it works, repo structure
+- `HOW-TO-UPDATE-DOCS.md` — how to update docs after any change
 
-- `docs/PROJECT_OVERVIEW.md` - A developer-focused overview of the project, folder structure, architecture, and runtime responsibilities.
-- `docs/aria-architecture-upgrade-plan.md` - The current architecture upgrade plan for Aria, including phased improvements, migration strategy, and implementation checklist.
-- `docs/ideas/user-supplied-api-keys.md` - Product and security rationale for the public user-supplied API key flow.
-- `docs/user-supplied-api-keys-implementation-plan.md` - Concrete implementation plan for the session-only API key settings flow.
-- `../BRAIN.md` - Brain authoring guidance for the AI knowledge corpus.
+## Tracking changes
+- `CHANGELOG.md` — version-by-version log of every meaningful change (Alpha → Beta → ...)
+- `CONTRIBUTING.md` — how to work on this project (for coders and non-coders)
 
-## How to Use
+## Architecture plans
+- `aria-architecture-upgrade-plan.md` — full phased upgrade roadmap (Alpha → Beta)
+- `aria-user-apikeys-plan.md` — implementation plan for user-supplied API key feature
 
-1. Start with `docs/PROJECT_OVERVIEW.md` to understand what Aria is, how it works, and where key functionality lives.
-2. Read `docs/aria-architecture-upgrade-plan.md` to see the planned architecture upgrades and the feature roadmap.
-3. Read `docs/ideas/user-supplied-api-keys.md` and `docs/user-supplied-api-keys-implementation-plan.md` before implementing the Phase 1 API key settings flow.
-4. Use `BRAIN.md` when editing or extending the knowledge files under `albion-brain/`.
+## Version snapshots (docs/versions/)
+- `ALPHA.md` — frozen record of what the Alpha version was
+
+## Architecture decisions (docs/decisions/)
+- `ADR-000-template.md` — copy this to record a new decision
+- `ADR-001-lexical-chunking.md` — why brain files are chunked instead of sent whole
+- `phase-0-checkpoint.md` — Phase 0 verification results (context reduction data)
+- `user-supplied-api-keys-rationale.md` — product/security rationale for the API key feature
+
+## Also see
+- `../BRAIN.md` — brain authoring guidelines for editing albion-brain/ files
