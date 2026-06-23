@@ -503,18 +503,18 @@ Build a settings panel in the existing sidebar UI. The user selects a provider, 
 **Context:** `8_weapons_armor.md` currently describes item stats only as relative percentages and rough approximations — no real Item Power values, no actual DPS figures, no armor resistance numbers. OpenAlbion exposes seven structured endpoints covering weapons, armors, accessories, consumables, their stats per quality/enchantment level, consumable crafting recipes, and spells per item. All responses use the same `identifier` field format (`T4_MAIN_SWORD`, `T4_ARMOR_CLOTH_SET1`) that `item-resolver.js` and `CRAFTING_RECIPES` in `crafting-profit.js` already use — so fetched data slots in without a translation layer.
 
 **Endpoint map confirmed from live docs:**
-- `GET /api/v3/weapons` → list with `id`, `name`, `tier`, `item_power`
-- `GET /api/v3/weapon-stats/weapon/{id}` → per-weapon stats (Item Power, Physical damage, Resilience penetration, Max Hit Points, HP Regen, DPS) × 5 quality levels × N enchantment levels
-- `GET /api/v3/armors` → list with `id`, `name`, `tier`, `item_power`, `identifier`
-- `GET /api/v3/armor-stats/armor/{id}` → per-armor stats (Item Power, Armor, Magical Resistance, Max Hit Points) × 5 quality levels
-- `GET /api/v3/accessories` → list with `id`, `name`, `tier`, `identifier`
-- `GET /api/v3/accessory-stats/accessory/{id}` → per-accessory stats (Item Power, Max Energy, Energy Regeneration)
-- `GET /api/v3/consumables` → list with `id`, `name`, `tier`, `identifier`, `info`
-- `GET /api/v3/consumable-stats/consumable/{id}` → per-consumable stats (Item Power, Nutrition, Weight, Crafting Speed, Crafting Quality)
-- `GET /api/v3/consumable-craftings/consumable/{id}` → full recipe with `requirements[]` each having `name`, `value`, `identifier`
-- `GET /api/v3/spells/weapon/{id}` → spells by slot (First/Fifth/Passive) with Energy Cost, Cast Time, Range, Cooldown, description
+- `GET https://api.openalbion.com/api/v3/weapons` → list with `id`, `name`, `tier`, `item_power`
+- `GET https://api.openalbion.com/api/v3/weapon-stats/weapon/{weapon_id}` → per-weapon stats (Item Power, Physical damage, Resilience penetration, Max Hit Points, HP Regen, DPS) × 5 quality levels × N enchantment levels
+- `GET https://api.openalbion.com/api/v3/armors` → list with `id`, `name`, `tier`, `item_power`, `identifier`
+- `GET https://api.openalbion.com/api/v3/armor-stats/armor/{armor_id}` → per-armor stats (Item Power, Armor, Magical Resistance, Max Hit Points) × 5 quality levels
+- `GET https://api.openalbion.com/api/v3/accessories` → list with `id`, `name`, `tier`, `identifier`
+- `GET https://api.openalbion.com/api/v3/accessory-stats/accessory/{accessory_id}` → per-accessory stats (Item Power, Max Energy, Energy Regeneration)
+- `GET https://api.openalbion.com/api/v3/consumables` → list with `id`, `name`, `tier`, `identifier`, `info`
+- `GET https://api.openalbion.com/api/v3/consumable-stats/consumable/{consumable_id}` → per-consumable stats (Item Power, Nutrition, Weight, Crafting Speed, Crafting Quality)
+- `GET https://api.openalbion.com/api/v3/consumable-craftings/consumable/{consumable_id}` → full recipe with `requirements[]` each having `name`, `value`, `identifier`
+- `GET https://api.openalbion.com/api/v3/spells/weapon/{weapon_id}` → spells by slot (First/Fifth/Passive) with Energy Cost, Cast Time, Range, Cooldown, description
 - `GET /api/v3/spells/armor/{id}` → spells by armor slot
-- `GET /api/v3/categories` → weapon/armor/accessory/consumable category tree with subcategory IDs
+- `GET https://api.openalbion.com/api/v3/categories` → weapon/armor/accessory/consumable category tree with subcategory IDs
 
 **Gap acknowledged:** No weapon or armor crafting recipe endpoint exists on OpenAlbion. Consumable recipes are fully covered. Weapon/armor recipe expansion (`CRAFTING_RECIPES` currently has only 6 hardcoded entries) requires the `ao-bin-dumps` repo already pulled by `scripts/fetch-items.js` — that source is tracked as a follow-on, not this phase.
 
