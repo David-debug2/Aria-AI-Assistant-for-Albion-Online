@@ -2,10 +2,11 @@
 
 This file tracks every meaningful change to the Aria project, version by version.
 
-## [1.0] - in progress
+## [v1.0.0-rc] - in progress
 **Theme:** "Make it stable"
 
 ### Added
+- SemVer release policy for Alpha, Beta, RC, GA, and post-launch updates in `docs/VERSIONING.md`.
 
 ### Changed
 

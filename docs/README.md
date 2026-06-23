@@ -10,6 +10,7 @@ This folder contains the project documentation for Aria.
 ## Tracking Changes
 - `CHANGELOG.md` - version-by-version log of meaningful changes.
 - `CONTRIBUTING.md` - setup, contribution, and documentation conventions.
+- `VERSIONING.md` - SemVer release lifecycle policy for Alpha, Beta, RC, and GA.
 
 ## Architecture Plans
 - `aria-architecture-upgrade-plan.md` - phased Alpha-to-Beta architecture roadmap.

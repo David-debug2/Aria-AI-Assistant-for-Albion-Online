@@ -20,7 +20,7 @@ Before writing anything, figure out which category your change falls into. Most 
 | Made a significant choice between two or more real approaches | **Decision** |
 | Updated game facts, prices, strategies in `albion-brain/` | **Brain File** |
 | Added a new API endpoint or changed an existing one's shape | **API** |
-| Closed out a full version (Alpha done, Beta done, etc.) | **Version Close** |
+| Closed out a release lifecycle stage (Alpha, Beta, RC, GA, etc.) | **Version Close** |
 | Added something that doesn't fit any category above | **Other** |
 
 > **Not sure?** If the change took more than 30 minutes or touched more than 2 files, treat it as a **Feature** or **Decision** and document it fully. When in doubt, over-document.
@@ -368,9 +368,9 @@ The root `README.md` has an API Reference section with request/response examples
 ---
 
 ### VERSION CLOSE
-*You've finished a major version (Alpha is done, Beta is done, etc.) and are ready to open the next one.*
+*You've finished a release lifecycle stage (Alpha, Beta, RC, GA, etc.) and are ready to open the next one.*
 
-This is the highest-effort doc task. Do it carefully — once a version snapshot is frozen, it's permanent.
+Aria's release lifecycle is defined in `docs/VERSIONING.md`. Use SemVer tags for release lines (`v1.0.0-alpha.1`, `v1.0.0-beta.1`, `v1.0.0-rc.1`, `v1.0.0`) and use the changelog as the human-readable release history. This is the highest-effort doc task. Do it carefully — once a version snapshot is frozen, it's permanent.
 
 **Step 1 — Complete all pending doc tasks for the closing version**
 
@@ -381,16 +381,16 @@ Before closing, every change in this version should already be documented. Run t
 
 **Step 2 — Set a close date in `docs/CHANGELOG.md`**
 
-Find the version section header and add the date:
+Find the version section header and add the date. Keep the lifecycle label or SemVer tag in the heading:
 
 ```markdown
-## [Beta] — 2026-09-15
+## [v1.0.0-rc.1] — 2026-09-15
 **Theme:** "Make it right"
 ```
 
 **Step 3 — Create a version snapshot in `docs/versions/`**
 
-Create a new file: `docs/versions/BETA.md` (or whatever the version name is).
+Create a new file in `docs/versions/` for the closed stage, such as `BETA.md`, `RC.md`, or `V1.0.0.md`.
 
 Use `docs/versions/ALPHA.md` as your template. Fill in every section for this version:
 
@@ -411,7 +411,7 @@ Use `docs/versions/ALPHA.md` as your template. Fill in every section for this ve
 Add a new section at the top of the file:
 
 ```markdown
-## [1.0] — _(in progress)_
+## [v1.0.0-rc] — _(in progress)_
 **Theme:** "Make it stable"
 
 ### Added
@@ -435,7 +435,7 @@ Add a new section at the top of the file:
 [ ] All changes in the closing version are documented in CHANGELOG
 [ ] All significant decisions in the closing version have ADRs
 [ ] Version snapshot created in docs/versions/ and frozen
-[ ] New version section opened at the top of CHANGELOG.md
+[ ] New SemVer-compatible version section opened at the top of CHANGELOG.md
 [ ] docs/README.md updated to list the new snapshot
 [ ] npm test passes
 ```
@@ -528,7 +528,7 @@ Group related commits into one entry. "Added OpenRouter provider, quota tracker,
 If there was only one reasonable way to do something, skip the ADR. If you genuinely weighed two approaches and chose one, write the ADR.
 
 **Rule 3: Never edit a closed version snapshot.**
-Once `ALPHA.md` or `BETA.md` is frozen, it never changes. If you discover something was wrong about that era, note it in the current CHANGELOG — don't rewrite history.
+Once a snapshot such as `ALPHA.md`, `BETA.md`, or a future GA snapshot is frozen, it never changes. If you discover something was wrong about that era, note it in the current CHANGELOG — don't rewrite history.
 
 **Rule 4: Update brain files for any Albion Online patch that changes game mechanics.**
 The brain files are the AI's knowledge. Outdated knowledge gives players wrong answers. After any significant Albion Online patch, review all 9 brain files and update what changed. Always add a date/source note.
