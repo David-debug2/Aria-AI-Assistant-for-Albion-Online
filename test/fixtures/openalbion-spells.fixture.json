@@ -1,0 +1,28 @@
+{
+  "weapons": [
+    {
+      "weapon_id": 2,
+      "identifier": "T4_2H_AXE",
+      "slot": "First Slot",
+      "name": "Rending Strike",
+      "attributes": [
+        { "name": "Energy Cost", "value": "6" },
+        { "name": "Range", "value": "3m" },
+        { "name": "Cooldown", "value": "2s" }
+      ],
+      "description": "Deal damage and apply a bleed."
+    }
+  ],
+  "armors": [
+    {
+      "armor_id": 100,
+      "identifier": "T4_ARMOR_PLATE_SET1",
+      "slot": "Chest",
+      "name": "Mend Wounds",
+      "attributes": [
+        { "name": "Cooldown", "value": "30s" }
+      ],
+      "description": "Recover health while channeling."
+    }
+  ]
+}

@@ -195,3 +195,57 @@
 | Enchanted Item @1 | +50k |
 | Enchanted Item @2 | +500k |
 | Legendary Item | 5000k+ |
+
+## OpenAlbion Baseline Stats
+
+Real baseline values below are Normal quality, flat enchantment (@0), sourced from `npm run fetch-openalbion`.
+
+### Weapon Stats
+| Item ID | Item Power | Damage | DPS |
+|---------|------------|--------|-----|
+| T4_MAIN_SWORD | 700 | 57 | 78/s |
+| T5_MAIN_SWORD | 800 | 62 | 84/s |
+| T6_MAIN_SWORD | 900 | 67 | 91/s |
+| T4_MAIN_AXE | 700 | 71 | 79/s |
+| T5_MAIN_AXE | 800 | 77 | 85/s |
+| T6_MAIN_AXE | 900 | 84 | 92/s |
+| T4_2H_BOW | 700 | 43 | 55/s |
+| T5_2H_BOW | 800 | 46 | 60/s |
+| T6_2H_BOW | 900 | 51 | 66/s |
+| T4_MAIN_HOLYSTAFF | 700 | - | 52/s |
+| T5_MAIN_HOLYSTAFF | 800 | - | 56/s |
+| T6_MAIN_HOLYSTAFF | 900 | - | 61/s |
+| T4_MAIN_NATURESTAFF | 700 | - | 52/s |
+| T5_MAIN_NATURESTAFF | 800 | - | 56/s |
+| T6_MAIN_NATURESTAFF | 900 | - | 61/s |
+| T4_MAIN_FIRESTAFF | 700 | - | 52/s |
+| T5_MAIN_FIRESTAFF | 800 | - | 56/s |
+| T6_MAIN_FIRESTAFF | 900 | - | 61/s |
+| T4_MAIN_FROSTSTAFF | 700 | - | 52/s |
+| T5_MAIN_FROSTSTAFF | 800 | - | 56/s |
+| T6_MAIN_FROSTSTAFF | 900 | - | 61/s |
+
+### Armor Stats
+| Item ID | Item Power | Armor | Magic Resist | Max HP |
+|---------|------------|-------|--------------|--------|
+| T4_ARMOR_PLATE_SET1 | 700 | 199 | 161 | 302 |
+| T5_ARMOR_PLATE_SET1 | 800 | 208 | 169 | 356 |
+| T6_ARMOR_PLATE_SET1 | 900 | 217 | 177 | 414 |
+| T4_ARMOR_LEATHER_SET1 | 700 | 156 | 156 | 302 |
+| T5_ARMOR_LEATHER_SET1 | 800 | 163 | 163 | 356 |
+| T6_ARMOR_LEATHER_SET1 | 900 | 171 | 171 | 414 |
+| T4_ARMOR_CLOTH_SET1 | 700 | 107 | 130 | 302 |
+| T5_ARMOR_CLOTH_SET1 | 800 | 113 | 137 | 356 |
+| T6_ARMOR_CLOTH_SET1 | 900 | 119 | 144 | 414 |
+
+### Spell Reference
+| Item ID | Slot | Spell | Energy | Range | Cooldown |
+|---------|------|-------|--------|-------|----------|
+| T4_MAIN_AXE | First Slot | Rending Strike | 6 | 3m | 2s |
+| T4_MAIN_AXE | Third Slot | Blood Bandit | 38 | 17m | 10s |
+| T4_MAIN_SWORD | First Slot | Heroic Strike | 8 | 3m | 3s |
+| T4_2H_BOW | First Slot | Multishot | 12 | 12m | 5s |
+| T4_MAIN_HOLYSTAFF | First Slot | Generous Heal | 18/20 | 14m | 2s |
+| T4_MAIN_NATURESTAFF | First Slot | Rejuvenation | 8 | 11m | 1s |
+| T4_MAIN_FIRESTAFF | First Slot | Fire Bolt | 9 | 12m | 0s |
+| T4_MAIN_FROSTSTAFF | First Slot | Frost Bolt | 11 | 11m | none |

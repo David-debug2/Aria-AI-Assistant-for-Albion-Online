@@ -1,0 +1,14 @@
+[
+  {
+    "id": 100,
+    "name": "Adept's Soldier Armor",
+    "tier": 4,
+    "identifier": "T4_ARMOR_PLATE_SET1",
+    "enchantment": 0,
+    "quality": "Normal",
+    "Item Power": "700",
+    "Armor": "218",
+    "Magical Resistance": "86",
+    "Max Hit Points": "345"
+  }
+]

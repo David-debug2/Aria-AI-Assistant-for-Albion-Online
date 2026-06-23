@@ -236,6 +236,12 @@ class AriaApp {
       } else {
         const profit = data.profit;
         const statusClass = profit > 100000 ? 'success' : profit > 0 ? 'warning' : 'danger';
+        const silverFeeLine = data.breakdown.silverFee > 0
+          ? `<li>Silver Fee: ${data.breakdown.silverFee.toLocaleString()}</li>`
+          : '';
+        const ingredientRows = Array.isArray(data.breakdown.ingredients)
+          ? data.breakdown.ingredients
+          : [];
 
         let html = `
           <div class="tool-card">
@@ -248,11 +254,28 @@ class AriaApp {
             <h4 style="margin-top: 15px; color: var(--highlight);">Cost Breakdown:</h4>
             <ul style="list-style: none; margin-top: 10px; font-size: 13px;">
               <li>Ingredients: ${data.breakdown.ingredientCost.toLocaleString()}</li>
+              ${silverFeeLine}
               <li>Crafting Tax: ${data.breakdown.craftingTax.toLocaleString()}</li>
               <li>Enchantment: ${data.breakdown.enchantmentCost.toLocaleString()}</li>
               <li><strong>Total Cost:</strong> ${data.breakdown.totalCost.toLocaleString()}</li>
               <li><strong>Sell Price:</strong> ${data.breakdown.sellPrice.toLocaleString()}</li>
             </ul>
+            ${ingredientRows.length ? `
+              <h4 style="margin-top: 15px; color: var(--highlight);">Ingredients:</h4>
+              <table class="data-table">
+                <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+                <tbody>
+                  ${ingredientRows.map(ingredient => `
+                    <tr>
+                      <td>${this.escapeHtml(ingredient.name || ingredient.id)}</td>
+                      <td>${ingredient.quantity.toLocaleString()}</td>
+                      <td>${ingredient.unitPrice.toLocaleString()}</td>
+                      <td>${ingredient.total.toLocaleString()}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : ''}
           </div>
         `;
 

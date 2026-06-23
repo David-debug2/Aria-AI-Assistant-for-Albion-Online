@@ -1,3 +1,10 @@
 node_modules/
 .env
 data/
+data/openalbion-lists.json
+data/openalbion-weapon-stats.json
+data/openalbion-armor-stats.json
+data/openalbion-consumable-stats.json
+data/openalbion-consumable-recipes.json
+data/openalbion-spells.json
+data/gameinfo-gear-recipes.json

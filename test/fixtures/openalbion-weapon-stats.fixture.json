@@ -1,0 +1,16 @@
+[
+  {
+    "id": 2,
+    "name": "Adept's Battleaxe",
+    "tier": 4,
+    "identifier": "T4_2H_AXE",
+    "enchantment": 0,
+    "quality": "Normal",
+    "Item Power": "700",
+    "Physical damage": "71",
+    "Resilience penetration": "40%",
+    "Max Hit Points": "0",
+    "HP Regen": "0",
+    "DPS": "79/s"
+  }
+]

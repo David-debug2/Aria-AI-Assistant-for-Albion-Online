@@ -8,6 +8,7 @@
     "dev": "node --watch src/server.js",
     "test": "node --test test/**/*.test.js",
     "fetch-items": "node scripts/fetch-items.js",
+    "fetch-openalbion": "node scripts/fetch-openalbion.js",
     "embed-brain": "node scripts/embed-brain.js"
   },
   "keywords": [],

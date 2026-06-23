@@ -117,3 +117,25 @@
 - **Bridgewatch**: Mixed, good profit
 - **Thetford**: Stone (less valuable)
 - **Martlock**: Leather, leather armor crafting
+
+## OpenAlbion Consumable Stats
+
+Real baseline values below are Normal quality, flat enchantment (@0), sourced from `npm run fetch-openalbion`.
+
+### T4-T6 Food Crafting Bonuses
+| Item ID | Food | Nutrition | Crafting Speed | Crafting Quality |
+|---------|------|-----------|----------------|------------------|
+| T4_MEAL_SALAD | Turnip Salad | 274 | +66 | +66 |
+| T4_MEAL_SALAD_FISH | Midwater Octopus Salad | 380 | +99 | +99 |
+| T6_MEAL_SALAD | Potato Salad | 821 | +100 | +100 |
+| T6_MEAL_SALAD_FISH | Deepwater Kraken Salad | 1110 | +148 | +148 |
+| T4_MEAL_SANDWICH | Goat Sandwich | 96 | - | - |
+| T6_MEAL_SANDWICH | Mutton Sandwich | 288 | - | - |
+| T5_MEAL_OMELETTE | Goose Omelette | 261 | - | - |
+| T5_MEAL_OMELETTE_FISH | Drybrook Crab Omelette | 362 | - | - |
+| T5_MEAL_PIE | Goose Pie | 306 | - | - |
+| T5_MEAL_PIE_FISH | Mountain Blindeye Pie | 362 | - | - |
+| T5_MEAL_SOUP | Cabbage Soup | 821 | - | - |
+| T5_MEAL_SOUP_FISH | Blackbog Clam Soup | 1110 | - | - |
+
+Use salads when the question is about crafting speed or crafting quality. Use the live market API for silver prices; these rows are stat data, not price advice.

@@ -56,9 +56,12 @@ An AI-powered strategy advisor for **Albion Online** players. Aria combines Clau
 
 2. **Fetch Item Data**
    ```bash
-   node scripts/fetch-items.js
+   npm run fetch-items
+   npm run fetch-openalbion
    ```
-   This downloads 10K+ items from the Albion community data repository.
+   The first command downloads 10K+ items from the Albion community data repository.
+   The second command downloads OpenAlbion stats, spells, consumable recipes, and Gameinfo gear recipes.
+   Re-run both commands after Albion Online patches so local item, stat, spell, and recipe data stays current.
 
 3. **Configure Environment** (`.env`)
    ```bash

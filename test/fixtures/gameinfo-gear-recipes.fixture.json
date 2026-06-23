@@ -1,0 +1,14 @@
+[
+  {
+    "identifier": "T5_MAIN_SWORD",
+    "name": "Expert's Broadsword",
+    "tier": 5,
+    "ingredients": [
+      { "uniqueName": "T5_METALBAR", "count": 16 },
+      { "uniqueName": "T5_PLANKS", "count": 8 }
+    ],
+    "silverCost": 250,
+    "craftingFocus": 315,
+    "craftingTime": 600
+  }
+]
