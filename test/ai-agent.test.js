@@ -11,13 +11,23 @@ const chatAnswer = {
   nextSteps: [],
 };
 
-function loadAiAgentWithBrainStub(loadBrainContext) {
+function loadAiAgentWithBrainStub(loadBrainContext, env = {}) {
   const brainLoaderPath = path.resolve(__dirname, '..', 'src', 'brain-loader.js');
   const aiAgentPath = path.resolve(__dirname, '..', 'src', 'ai-agent.js');
-  const previousGoogleApiKey = process.env.GOOGLE_API_KEY;
+  const previousEnv = {
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
+    CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+  };
 
   delete require.cache[aiAgentPath];
   process.env.GOOGLE_API_KEY = '';
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.CLOUDFLARE_API_TOKEN;
+  delete process.env.CLOUDFLARE_ACCOUNT_ID;
+  Object.assign(process.env, env);
+
   require.cache[brainLoaderPath] = {
     id: brainLoaderPath,
     filename: brainLoaderPath,
@@ -32,31 +42,44 @@ function loadAiAgentWithBrainStub(loadBrainContext) {
     cleanup() {
       delete require.cache[aiAgentPath];
       delete require.cache[brainLoaderPath];
-      if (previousGoogleApiKey === undefined) {
-        delete process.env.GOOGLE_API_KEY;
-      } else {
-        process.env.GOOGLE_API_KEY = previousGoogleApiKey;
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
     },
   };
 }
 
-test('AI agent Ollama routing', async (t) => {
-  await t.test('forced summarize intent reaches the Ollama branch', async () => {
-    let ollamaCall = null;
-    let geminiCalls = 0;
-    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(async (query, forceIntent) => ({
-      context: 'Stub brain context',
-      intent: forceIntent || 'market',
-      filesLoaded: ['stub.md'],
-    }));
+function stubBrain(intent = 'summarize') {
+  return async (query, forceIntent) => ({
+    context: 'Stub brain context',
+    intent: forceIntent || intent,
+    filesLoaded: ['stub.md'],
+  });
+}
+
+test('AI provider fallback chain', async (t) => {
+  await t.test('first provider success returns OpenRouter engine metadata', async () => {
+    const calls = [];
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
     const resetProviders = aiAgent.__setTestProviders({
-      askOllama: async (prompt, model) => {
-        ollamaCall = { prompt, model };
+      askOpenRouter: async (prompt, model) => {
+        calls.push(['openrouter', model, prompt]);
+        return JSON.stringify(chatAnswer);
+      },
+      askCloudflare: async () => {
+        calls.push(['cloudflare']);
+        return JSON.stringify(chatAnswer);
+      },
+      askOllama: async () => {
+        calls.push(['ollama']);
         return JSON.stringify(chatAnswer);
       },
       askGemini: async () => {
-        geminiCalls += 1;
+        calls.push(['gemini']);
         return chatAnswer;
       },
     });
@@ -67,66 +90,34 @@ test('AI agent Ollama routing', async (t) => {
 
     const result = await aiAgent.ask('Narrate this computed JSON', { rankedOpportunities: [] }, 'summarize');
 
-    assert(ollamaCall, 'Ollama should be called');
-    assert.strictEqual(ollamaCall.model, 'qwen3.6');
-    assert.match(ollamaCall.prompt, /LIVE MARKET DATA/);
-    assert.match(ollamaCall.prompt, /rankedOpportunities/);
-    assert.strictEqual(geminiCalls, 0);
-    assert.strictEqual(result.engine, 'ollama');
+    assert.deepStrictEqual(calls.map(call => call[0]), ['openrouter']);
+    assert.match(calls[0][2], /LIVE MARKET DATA/);
+    assert.match(calls[0][2], /rankedOpportunities/);
+    assert.strictEqual(result.engine, 'openrouter');
     assert.strictEqual(result.intent, 'summarize');
     assert.strictEqual(result.responseType, 'chatAnswer');
     assert.deepStrictEqual(result.response, chatAnswer);
   });
 
-  await t.test('unforced market intent stays on Gemini Flash', async () => {
-    let ollamaCalls = 0;
-    let geminiCall = null;
-    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(async (query, forceIntent) => ({
-      context: 'Stub market context',
-      intent: forceIntent || 'market',
-      filesLoaded: ['market.md'],
-    }));
+  await t.test('429-class OpenRouter failure falls through to Cloudflare', async () => {
+    const calls = [];
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
     const resetProviders = aiAgent.__setTestProviders({
-      askOllama: async () => {
-        ollamaCalls += 1;
+      askOpenRouter: async () => {
+        calls.push('openrouter');
+        const err = new aiAgent.ProviderRequestError('rate limited', 429, 'openrouter');
+        throw err;
+      },
+      askCloudflare: async () => {
+        calls.push('cloudflare');
         return JSON.stringify(chatAnswer);
       },
-      askGemini: async (prompt, model, responseType) => {
-        geminiCall = { prompt, model, responseType };
-        return { summary: 'Market answer' };
-      },
-    });
-    t.after(() => {
-      resetProviders();
-      cleanup();
-    });
-
-    const result = await aiAgent.ask('Where should I sell T5 bags?');
-
-    assert.strictEqual(ollamaCalls, 0);
-    assert(geminiCall, 'Gemini should be called');
-    assert.strictEqual(geminiCall.model, 'gemini-3.5-flash');
-    assert.strictEqual(geminiCall.responseType, 'flipRanking');
-    assert.strictEqual(result.engine, 'gemini-flash');
-    assert.strictEqual(result.intent, 'market');
-    assert.strictEqual(result.responseType, 'flipRanking');
-  });
-
-  await t.test('failed Ollama call falls back to Gemini Flash with summarize metadata', async () => {
-    let ollamaCalls = 0;
-    let geminiCall = null;
-    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(async (query, forceIntent) => ({
-      context: 'Stub brain context',
-      intent: forceIntent || 'market',
-      filesLoaded: ['stub.md'],
-    }));
-    const resetProviders = aiAgent.__setTestProviders({
       askOllama: async () => {
-        ollamaCalls += 1;
-        return null;
+        calls.push('ollama');
+        return JSON.stringify(chatAnswer);
       },
-      askGemini: async (prompt, model, responseType) => {
-        geminiCall = { prompt, model, responseType };
+      askGemini: async () => {
+        calls.push('gemini');
         return chatAnswer;
       },
     });
@@ -135,14 +126,97 @@ test('AI agent Ollama routing', async (t) => {
       cleanup();
     });
 
-    const result = await aiAgent.ask('Narrate this computed JSON', { trendSummary: {} }, 'summarize');
+    const result = await aiAgent.ask('Summarize this data', null, 'summarize');
 
-    assert.strictEqual(ollamaCalls, 1);
-    assert(geminiCall, 'Gemini fallback should be called');
-    assert.strictEqual(geminiCall.model, 'gemini-3.5-flash');
-    assert.strictEqual(geminiCall.responseType, 'chatAnswer');
-    assert.strictEqual(result.engine, 'gemini-flash (ollama fallback)');
-    assert.strictEqual(result.intent, 'summarize');
+    assert.deepStrictEqual(calls, ['openrouter', 'cloudflare']);
+    assert.strictEqual(result.engine, 'cloudflare');
+    assert.deepStrictEqual(result.response, chatAnswer);
+  });
+
+  await t.test('400-class provider error stops fallback and surfaces the error', async () => {
+    const calls = [];
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
+    const resetProviders = aiAgent.__setTestProviders({
+      askOpenRouter: async () => {
+        calls.push('openrouter');
+        throw new aiAgent.ProviderRequestError('bad request', 400, 'openrouter');
+      },
+      askCloudflare: async () => {
+        calls.push('cloudflare');
+        return JSON.stringify(chatAnswer);
+      },
+      askOllama: async () => {
+        calls.push('ollama');
+        return JSON.stringify(chatAnswer);
+      },
+      askGemini: async () => {
+        calls.push('gemini');
+        return chatAnswer;
+      },
+    });
+    t.after(() => {
+      resetProviders();
+      cleanup();
+    });
+
+    await assert.rejects(
+      () => aiAgent.ask('Summarize this data', null, 'summarize'),
+      err => err.name === 'ProviderRequestError' && err.status === 400
+    );
+    assert.deepStrictEqual(calls, ['openrouter']);
+  });
+
+  await t.test('all providers exhausted throws a chain error', async () => {
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain());
+    const resetProviders = aiAgent.__setTestProviders({
+      askOpenRouter: async () => null,
+      askCloudflare: async () => null,
+      askOllama: async () => null,
+      askGemini: async () => null,
+    });
+    t.after(() => {
+      resetProviders();
+      cleanup();
+    });
+
+    await assert.rejects(
+      () => aiAgent.ask('Summarize this data', null, 'summarize'),
+      err => err.name === 'ProviderChainError' && err.failures.length === 4
+    );
+  });
+
+  await t.test('OpenRouter quota threshold skips network and routes to Cloudflare', async () => {
+    const previousFetch = globalThis.fetch;
+    const fetchCalls = [];
+    globalThis.fetch = async (url) => {
+      fetchCalls.push(String(url));
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(chatAnswer) } }],
+        }),
+      };
+    };
+
+    const { aiAgent, cleanup } = loadAiAgentWithBrainStub(stubBrain(), {
+      OPENROUTER_API_KEY: 'openrouter-key',
+      CLOUDFLARE_API_TOKEN: 'cloudflare-token',
+      CLOUDFLARE_ACCOUNT_ID: 'cloudflare-account',
+    });
+    aiAgent.__openRouterQuotaForTests.setState({ calls: 45 });
+    t.after(() => {
+      globalThis.fetch = previousFetch;
+      aiAgent.__openRouterQuotaForTests.reset();
+      cleanup();
+    });
+
+    const result = await aiAgent.ask('Summarize this data', null, 'summarize');
+
+    assert.deepStrictEqual(fetchCalls, [
+      'https://api.cloudflare.com/client/v4/accounts/cloudflare-account/ai/v1/chat/completions',
+    ]);
+    assert.strictEqual(result.engine, 'cloudflare');
     assert.deepStrictEqual(result.response, chatAnswer);
   });
 });
