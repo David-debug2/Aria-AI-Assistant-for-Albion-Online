@@ -96,7 +96,7 @@ test('Market Analyzer computed margins', async (t) => {
     assert.strictEqual(askArgs[1].rankedOpportunities[0].itemId, 'T5_BAG');
     assert.strictEqual(askArgs[1].rankedOpportunities[0].profitPerUnit, 309);
     assert.strictEqual(askArgs[1].rankedOpportunities[1].profitable, false);
-    assert.strictEqual(askArgs[2], 'market');
+    assert.strictEqual(askArgs[2], 'summarize');
   });
 
   await t.test('analyzeTrend should compute spread and tax-adjusted profit before narration', async () => {
@@ -129,6 +129,6 @@ test('Market Analyzer computed margins', async (t) => {
     assert.strictEqual(askArgs[1].spread, 300);
     assert.strictEqual(askArgs[1].tax, 78);
     assert.strictEqual(askArgs[1].profitAfterTax, 222);
-    assert.strictEqual(askArgs[2], 'market');
+    assert.strictEqual(askArgs[2], 'summarize');
   });
 });

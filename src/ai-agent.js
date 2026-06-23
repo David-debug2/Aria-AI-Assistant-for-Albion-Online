@@ -17,6 +17,11 @@ const GEMINI_PRO   = 'gemini-3.1-pro-preview';
 const OLLAMA_INTENTS = new Set(['summarize', 'format', 'list']);
 const GEMINI_PRO_INTENTS = new Set(['build', 'pvp', 'guild', 'strategy']);
 
+const providerRuntime = {
+  askOllama: (...args) => askOllama(...args),
+  askGemini: (...args) => askGemini(...args),
+};
+
 const SYSTEM_PROMPT = `You are an expert Albion Online strategist, economist, and guide writer.
 You have been given a knowledge base about the game. Always prioritize information from that knowledge base.
 When live market data is included, analyze it concretely: give specific item names, exact silver values, and ranked recommendations.
@@ -100,18 +105,18 @@ async function ask(query, liveData = null, forceIntent = null, aiOptions = null)
       ? 'qwen3.6'          // highly optimized for fast structured text
       : 'deepseek-v4-pro'; // deep reasoning fallback if offline
 
-    response = await askOllama(userMessage, ollamaModel);
+    response = await providerRuntime.askOllama(userMessage, ollamaModel);
     
     if (!response) {
-      response = await askGemini(userMessage, GEMINI_FLASH, responseType);
+      response = await providerRuntime.askGemini(userMessage, GEMINI_FLASH, responseType);
       return { responseType, response, engine: 'gemini-flash (ollama fallback)', intent, filesLoaded };
     }
 
     response = parseAndValidateModelJson(response, responseType);
   } else if (engine === 'gemini-pro') {
-    response = await askGemini(userMessage, GEMINI_PRO, responseType);
+    response = await providerRuntime.askGemini(userMessage, GEMINI_PRO, responseType);
   } else {
-    response = await askGemini(userMessage, GEMINI_FLASH, responseType);
+    response = await providerRuntime.askGemini(userMessage, GEMINI_FLASH, responseType);
   }
 
   return { responseType, response, engine, intent, filesLoaded };
@@ -436,5 +441,13 @@ module.exports = {
   askAnthropic,
   askGeminiWithKey,
   MalformedModelOutputError,
-  parseAndValidateModelJson
+  parseAndValidateModelJson,
+  __setTestProviders(overrides = {}) {
+    if (overrides.askOllama) providerRuntime.askOllama = overrides.askOllama;
+    if (overrides.askGemini) providerRuntime.askGemini = overrides.askGemini;
+    return () => {
+      providerRuntime.askOllama = (...args) => askOllama(...args);
+      providerRuntime.askGemini = (...args) => askGemini(...args);
+    };
+  }
 };

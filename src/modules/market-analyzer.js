@@ -139,7 +139,7 @@ async function findBestFlips(budget, server = 'west') {
       taxRate: DEFAULT_MARKET_TAX_RATE,
       rankedOpportunities,
     },
-    'market'
+    'summarize'
   );
 }
 
@@ -154,7 +154,7 @@ async function analyzeTrend(itemQuery, location = 'Caerleon') {
      Do not calculate or change any arithmetic. Use the provided direction, price change,
      buy/sell timing, spread, margin, and profit-after-tax figures. Briefly mention plausible market drivers.`,
     trendSummary,
-    'market'
+    'summarize'
   );
 }
 

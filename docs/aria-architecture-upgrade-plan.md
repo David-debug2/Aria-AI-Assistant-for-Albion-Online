@@ -338,31 +338,48 @@ Build a settings panel in the existing sidebar UI. The user selects a provider, 
 
 ### Phase 6: Fix Dead Ollama Routing
 
-#### Task 16: Align intents so the local-model path is reachable
-**Description:** `chooseEngine` checks `OLLAMA_INTENTS = {summarize, format, list}`, but `detectIntent` in `brain-loader.js` only ever returns one of 9 unrelated intents — the Ollama branch has never fired. Add a `forceIntent` call from the now-computed-JSON narration calls (Task 14, and the crafting-profit summary path) that explicitly routes to `'summarize'`.
+**Phase goal:** Turn the new Phase 5 "compute in JS, narrate JSON" call sites into the first real users of the local-model path. This phase should not broaden Ollama routing globally; it should only route narration-only prompts that already have deterministic computed data.
+
+**Current connection:** Task 14 already changes `market-analyzer.js` so `findBestFlips()` and `analyzeTrend()` compute margins in JS and pass ranked/summary JSON to `ask()`. Those call sites currently still force the normal `market` intent, which keeps `chooseEngine()` on Gemini Flash. Phase 6 changes that specific handoff to `forceIntent: 'summarize'`, updates the matching tests, and then verifies the existing Ollama-to-Gemini fallback path.
+
+#### Task 16: Route computed market narration through `summarize`
+**Description:** `chooseEngine()` checks `OLLAMA_INTENTS = {summarize, format, list}`, but `detectIntent()` in `brain-loader.js` only returns gameplay/domain intents such as `market`. The local Ollama branch therefore remains unreachable unless a caller intentionally forces one of the Ollama intents. Change the Phase 5 computed narration calls in `market-analyzer.js` from forced `market` intent to forced `summarize` intent.
 **Acceptance criteria:**
-- [ ] Narration-only calls (post-computation summaries) pass `forceIntent: 'summarize'` and visibly hit the Ollama branch in logs
-- [ ] Topic-detection calls (`ask()` without forced intent) are unaffected
+- [x] `findBestFlips()` calls `ask(..., liveData, 'summarize')` after computing `rankedOpportunities`
+- [x] `analyzeTrend()` calls `ask(..., liveData, 'summarize')` after computing `trendSummary`
+- [x] The narration prompts still forbid arithmetic changes and still pass the computed JSON through `liveData`
+- [x] Topic-detection calls (`ask()` without forced intent) remain unaffected
 
 **Verification:**
-- [ ] Manual check: temporarily log `engine` in the `ask()` return value and confirm `'ollama'` appears for at least one call path
-**Dependencies:** Task 14 (gives this phase something real to route)
-**Files likely touched:** `src/ai-agent.js`, `src/modules/market-analyzer.js`, `src/modules/crafting-profit.js`
+- [x] `test/market-analyzer.test.js` expects `askArgs[2] === 'summarize'` for both computed narration call paths
+- [x] `npm test` passes
+**Dependencies:** Task 14 (provides deterministic computed JSON for local-model narration)
+**Files likely touched:** `src/modules/market-analyzer.js`, `test/market-analyzer.test.js`
 **Estimated scope:** S
 
-#### Task 17: Confirm Gemini-Flash fallback still works when Ollama is unreachable
-**Description:** Verify the existing `if (!response) { askGemini(... GEMINI_FLASH) }` fallback in `ai-agent.js` still triggers correctly now that the Ollama branch is actually reachable.
+#### Task 17: Add focused routing and fallback coverage in `ai-agent`
+**Description:** Add direct coverage for the intent-to-engine behavior so this path does not silently die again. The tests should prove that `forceIntent: 'summarize'` produces an Ollama attempt, that ordinary domain intents continue to use their existing Gemini routing, and that the Gemini Flash fallback still works when Ollama is unreachable.
 **Acceptance criteria:**
-- [ ] Stopping the local Ollama service still results in a valid response via Gemini Flash fallback
+- [x] A forced `summarize` request reaches the Ollama branch
+- [x] Topic-detection calls (`ask()` without forced intent) are unaffected
+- [x] The response metadata still reports the final serving engine and intent
+- [x] A failed Ollama call returns a valid Gemini Flash response
+- [x] The returned `engine` is `gemini-flash (ollama fallback)`
+- [x] The returned `intent` remains `summarize`
 
 **Verification:**
-- [ ] Manual check: stop Ollama, issue a `forceIntent: 'summarize'` request, confirm `engine: 'gemini-flash (ollama fallback)'` in the response
+- [x] Unit/integration test stubs Ollama success and confirms `engine: 'ollama'`
+- [x] Unit/integration test confirms an unforced market-style query does not route to Ollama
+- [x] Unit/integration test stubs `askOllama()` to return `null` and confirms Gemini Flash fallback metadata
+- [ ] Optional manual check: stop Ollama, issue a forced `summarize` request, confirm fallback response
 **Dependencies:** Task 16
-**Files likely touched:** None (verification only)
-**Estimated scope:** XS
+**Files likely touched:** `test/ai-agent.test.js`
+**Estimated scope:** S
 
 ### Checkpoint: Phase 6
-- [ ] Confirm in logs that both the Ollama path and its fallback are exercised
+- [x] `npm test` green across the full suite
+- [x] Confirm via tests or logs that both the Ollama path and its fallback are exercised
+- [x] Confirm Phase 7 dependency notes still point at the `summarize` narration path established here
 - [ ] Review with human before proceeding
 
 ---
