@@ -7,12 +7,16 @@ This file tracks every meaningful change to the Aria project, version by version
 
 ### Added
 - SemVer release policy for Alpha, Beta, RC, GA, and post-launch updates in `docs/VERSIONING.md`.
+- Aria RC: Provider & Market Intelligence Update roadmap in `docs/aria-rc-provider-market-intelligence-update.md`.
+- BYOK planning source in `docs/aria-byok.md`.
 
 ### Changed
 
 ### Fixed
 
 ### Decided
+- Proposed removing Ollama from the server fallback chain for the RC provider cleanup (see `decisions/ADR-007-provider-chain-without-ollama.md`).
+- Proposed stateless BYOK headers with key fingerprint rate limiting (see `decisions/ADR-008-byok-stateless-header-proxy.md`).
 
 ---
 

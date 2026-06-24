@@ -14,6 +14,9 @@ This folder contains the project documentation for Aria.
 
 ## Architecture Plans
 - `aria-architecture-upgrade-plan.md` - phased Alpha-to-Beta architecture roadmap.
+- `aria-rc-provider-market-intelligence-update.md` - RC roadmap for provider cleanup, BYOK, and market intelligence.
+- `aria-byok.md` - BYOK planning source for stateless per-request user keys.
+- `albion-data-market-intelligence-update.md` - detailed Albion Data market intelligence roadmap.
 - `user-api-keys-plan.md` - implementation plan for user-supplied API keys.
 
 ## Version Snapshots
@@ -28,6 +31,8 @@ This folder contains the project documentation for Aria.
 - `decisions/ADR-004-structured-json-output.md` - why AI output is schema-shaped JSON.
 - `decisions/ADR-005-provider-fallback-chain.md` - why server-configured providers are stacked as fallbacks.
 - `decisions/ADR-006-openalbion-gameinfo-data.md` - why OpenAlbion and Gameinfo are used for real item data.
+- `decisions/ADR-007-provider-chain-without-ollama.md` - proposed RC decision to remove Ollama from the server fallback chain.
+- `decisions/ADR-008-byok-stateless-header-proxy.md` - proposed RC decision for stateless BYOK headers and key fingerprint rate limiting.
 - `decisions/phase-0-checkpoint.md` - Phase 0 verification results and context reduction samples.
 - `decisions/user-supplied-api-keys-rationale.md` - product/security rationale for the API key feature.
 
