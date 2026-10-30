@@ -6,7 +6,7 @@ The project is designed around a simple idea: players should be able to ask natu
 
 ## Overview
 
-Aria combines an AI chat experience with Albion-focused knowledge and market-aware context. It can help players reason through common decisions such as choosing gear, comparing economic opportunities, planning crafting routes, understanding item value, or preparing for different types of content.
+Aria combines an AI chat experience with Albion-focused knowledge and market-aware context. It can help players reason through common decisions such as choosing gear, comparing economic opportunities, planning crafting routes, understanding item value, or preparing for different types of content.a
 
 The assistant is intended to support both solo players and groups. For individuals, it can provide advice on builds, progression, silver-making, and item choices. For guilds, it can help with territory planning, group composition, and strategic decision-making.
 
