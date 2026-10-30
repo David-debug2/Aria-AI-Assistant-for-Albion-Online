@@ -2,7 +2,7 @@
 
 Aria is an AI-powered strategy companion for Albion Online players. It helps turn game knowledge, market context, and player goals into practical guidance for builds, crafting, economy decisions, PvP preparation, and guild planning.
 
-The project is designed around a simple idea: players should be able to ask natural questions and receive useful, game-aware answers without digging through scattered notes, tools, or spreadsheets.
+The project is designed around a simple idea: players should be able to ask natural questions and receive useful, game-aware answers without digging through scattered notes, tools, or spreadsheets.a
 
 ## Overview
 
